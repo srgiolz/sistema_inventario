@@ -2,73 +2,103 @@
 
 @section('content')
 <div class="container">
-    <h2>Historial de Traspasos</h2>
 
-    <a href="{{ route('traspasos.create') }}" class="btn btn-primary mb-3">+ Nuevo Traspaso</a>
+    {{-- 🔔 Mensajes flash --}}
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+    @endif
 
-    <table class="table table-bordered table-hover table-sm align-middle">
-        <thead class="table-dark text-center">
-            <tr>
-                <th>ID</th>
-                <th>Tipo</th>
-                <th>De</th>
-                <th>A</th>
-                <th>Fecha</th>
-                <th>Observación</th>
-                <th>Productos</th>
-                <th>Estado</th>
-                <th>Acción</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($traspasos as $t)
-                <tr>
-                    <td class="text-center">{{ $t->id }}</td>
-                    <td class="text-center">
-                        @if($t->tipo == 'abastecimiento')
-                            <span class="badge bg-success">Abastecimiento</span>
-                        @else
-                            <span class="badge bg-secondary">Sucursal</span>
-                        @endif
-                    </td>
-                    <td>{{ $t->sucursalOrigen->nombre }}</td>
-                    <td>{{ $t->sucursalDestino->nombre }}</td>
-                    <td class="text-center">{{ \Carbon\Carbon::parse($t->fecha)->format('d/m/Y') }}</td>
-                    <td>{{ $t->observacion }}</td>
-                    <td>
-                        <ul class="mb-0">
-                            @foreach($t->detalles as $detalle)
-                                <li>
-                                    {{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}
-                                    <span class="text-muted">({{ $detalle->cantidad }})</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </td>
-                    <td class="text-center">
-                        @if($t->estado == 'pendiente')
-                            <span class="badge bg-warning text-dark">Pendiente</span>
-                        @elseif($t->estado == 'confirmado')
-                            <span class="badge bg-success">Confirmado</span>
-                        @else
-                            <span class="badge bg-danger">Rechazado</span>
-                        @endif
-                    </td>
-                    <td class="text-center">
-    <a href="{{ url('/traspasos/' . $t->id . '/revisar') }}" class="btn btn-outline-primary btn-sm" title="Revisar">
-        <i class="bi bi-eye"></i> Revisar
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+    @endif
+
+    <h4 class="mb-3">
+        <i class="bi bi-arrow-left-right text-success"></i> 
+        Historial de <span class="fw-bold">Traspasos</span>
+    </h4>
+
+    <a href="{{ route('traspasos.create') }}" class="btn btn-primary mb-4 shadow-sm">
+        <i class="bi bi-plus-circle me-1"></i> Nuevo Traspaso
     </a>
 
-    @if($t->estado == 'pendiente')
-        <a href="{{ route('traspasos.edit', $t->id) }}" class="btn btn-outline-warning btn-sm mt-1" title="Editar">
-            <i class="bi bi-pencil"></i> Editar
-        </a>
-    @endif
-</td>
+    @foreach($traspasos as $t)
+        <div class="card mb-4 border-0 shadow-sm rounded-3">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                <h5 class="mb-0">
+                    <i class="bi bi-arrow-left-right text-success"></i> Traspaso #{{ $t->id }}
+                </h5>
+                <small class="text-muted">
+                    <strong>Fecha:</strong> {{ \Carbon\Carbon::parse($t->fecha)->format('d/m/Y') }} |
+                    <strong>Tipo:</strong> {{ ucfirst($t->tipo) }} |
+                    <strong>Estado:</strong>
+                    @if($t->estado == 'pendiente')
+                        <span class="badge bg-warning text-dark">Pendiente</span>
+                    @elseif($t->estado == 'confirmado')
+                        <span class="badge bg-success">Confirmado</span>
+                    @else
+                        <span class="badge bg-danger">Rechazado</span>
+                    @endif
+                </small>
+            </div>
 
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+            <div class="card-body">
+                {{-- Sucursales --}}
+                <div class="p-2 mb-3 bg-light rounded border-start border-3 border-info">
+                    <i class="bi bi-shop text-info me-2"></i>
+                    <strong>De:</strong> {{ $t->sucursalOrigen->nombre }} 
+                    <i class="bi bi-arrow-right mx-2"></i>
+                    <strong>A:</strong> {{ $t->sucursalDestino->nombre }}
+                </div>
+
+                {{-- Observación --}}
+                @if ($t->observacion)
+                    <div class="p-2 mb-3 bg-light rounded border-start border-3 border-primary">
+                        <i class="bi bi-journal-text text-primary me-2"></i>
+                        <strong>Observación:</strong> {{ $t->observacion }}
+                    </div>
+                @endif
+
+                {{-- Tabla de productos --}}
+                <table class="table table-hover table-sm align-middle">
+                    <thead class="table-primary text-center">
+                        <tr>
+                            <th>Producto</th>
+                            <th width="120">Cantidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($t->detalles as $detalle)
+                            <tr>
+                                <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+                                <td class="text-center fw-bold">{{ $detalle->cantidad }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+
+                {{-- Botones de acción --}}
+                <div class="mt-3 d-flex flex-wrap gap-2">
+                    {{-- Revisar --}}
+                    <a href="{{ url('/traspasos/' . $t->id . '/revisar') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> Revisar
+                    </a>
+
+                    {{-- Editar (si está pendiente) --}}
+                    @if($t->estado == 'pendiente')
+                        <a href="{{ route('traspasos.edit', $t->id) }}" class="btn btn-outline-warning btn-sm">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endforeach
 </div>
 @endsection
+

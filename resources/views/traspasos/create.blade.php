@@ -121,9 +121,16 @@ function inicializarSelect2(sucursalId) {
             url: `/api/productos-por-sucursal/${sucursalId}`,
             dataType: 'json',
             delay: 250,
-            processResults: data => ({
-                results: data
-            })
+            data: function (params) {
+                return {
+                    term: params.term || '' // 🔹 Enviamos lo que escribe el usuario
+                };
+            },
+            processResults: function (data) {
+                return {
+                    results: data
+                };
+            }
         }
     });
 }

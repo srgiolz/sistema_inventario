@@ -262,6 +262,23 @@ public function show($id)
     $traspaso = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])->findOrFail($id);
     return view('traspasos.show', compact('traspaso'));
 }
+public function productosPorSucursal($idSucursal, Request $request)
+{
+    $term = strtolower($request->get('term', ''));
 
+    $productos = Producto::whereHas('inventarios', function($q) use ($idSucursal) {
+            $q->where('id_sucursal', $idSucursal);
+        })
+        ->when($term, function($query, $term) {
+            $query->where(function ($sub) use ($term) {
+                $sub->whereRaw('LOWER(nombre) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(codigo) LIKE ?', ["%{$term}%"]);
+            });
+        })
+        ->select('id', DB::raw("CONCAT(codigo, ' - ', nombre) as text"))
+        ->limit(20)
+        ->get();
 
+    return response()->json($productos);
+}
 }

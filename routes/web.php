@@ -13,22 +13,6 @@ use App\Http\Controllers\PanelController;
 // Rutas protegidas por auth
 Route::middleware(['auth'])->group(function () {
     
-    // 🔍 Productos por sucursal para Select2 (solo con stock > 0)
-Route::get('/api/productos-por-sucursal/{sucursal_id}', function ($sucursal_id) {
-    $productos = \App\Models\Inventario::where('id_sucursal', $sucursal_id)
-        ->where('cantidad', '>', 0)
-        ->with('producto:id,item_codigo,descripcion') // Asegurate que exista esta relación
-        ->get()
-        ->map(function ($i) {
-            return [
-                'id' => $i->producto->id,
-                'text' => "{$i->producto->item_codigo} - {$i->producto->descripcion}"
-            ];
-        });
-
-    return response()->json($productos);
-});
-
 
     // 🏠 Panel principal
     Route::get('/', [PanelController::class, 'index'])->name('panel.index');
@@ -48,9 +32,16 @@ Route::get('/api/productos-por-sucursal/{sucursal_id}', function ($sucursal_id) 
     Route::put('entradas/{id}', [EntradaController::class, 'update'])->name('entradas.update');
     Route::get('/entradas/{id}/pdf', [EntradaController::class, 'generarPdf'])->name('entradas.pdf');
 
-
+    //Inventario/Salidas
     Route::resource('salidas', SalidaController::class);
+    Route::get('/salidas/{id}/pdf', [\App\Http\Controllers\SalidaController::class, 'generarPdf'])->name('salidas.pdf');
+    Route::post('/salidas/{id}/reversar', [\App\Http\Controllers\SalidaController::class, 'reversar'])->name('salidas.reversar');
+    Route::get('/salidas/{id}/edit', [\App\Http\Controllers\SalidaController::class, 'edit'])->name('salidas.edit');
+    Route::put('/salidas/{id}', [\App\Http\Controllers\SalidaController::class, 'update'])->name('salidas.update');
+
+    
     Route::resource('traspasos', TraspasoController::class);
+    Route::get('/api/productos-por-sucursal/{id}', [TraspasoController::class, 'productosPorSucursal']);
 
     // 📄 PDF y revisión de traspasos
     Route::get('/traspasos/{traspaso}/pdf', [TraspasoController::class, 'generarPDF'])->name('traspasos.pdf');

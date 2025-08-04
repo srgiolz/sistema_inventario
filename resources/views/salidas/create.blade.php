@@ -2,7 +2,13 @@
 
 @section('content')
 <div class="container">
-    <h2 class="mb-3">➖ Registrar nueva salida</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">➖ Registrar nueva salida</h2>
+    <a href="{{ route('salidas.index') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-arrow-left-circle"></i> Volver al historial
+    </a>
+</div>
+
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
