@@ -30,55 +30,53 @@ class TraspasoController extends Controller
     }
 
     public function store(Request $request)
-    {
-        // Validar traspaso general
-        $request->validate([
-            'de_sucursal' => 'required|different:a_sucursal|exists:sucursales,id',
-            'a_sucursal' => 'required|exists:sucursales,id',
-            'fecha' => 'required|date',
-            'observacion' => 'nullable|string|max:255',
-            'productos' => 'required|array|min:1',
-            'productos.*.id_producto' => 'required|exists:productos,id',
-            'productos.*.cantidad' => 'required|integer|min:1',
-        ]);
+{
+    $request->validate([
+        'de_sucursal' => 'required|different:a_sucursal|exists:sucursales,id',
+        'a_sucursal' => 'required|exists:sucursales,id',
+        'fecha' => 'required|date',
+        'observacion' => 'nullable|string|max:255',
+        'productos' => 'required|array|min:1',
+        'productos.*.id_producto' => 'required|exists:productos,id',
+        'productos.*.cantidad' => 'required|integer|min:1',
+    ]);
+    // 🔹 Verificar productos duplicados
+$idsProductos = array_column($request->productos, 'id_producto');
+if (count($idsProductos) !== count(array_unique($idsProductos))) {
+    return back()
+        ->withErrors(['error' => '❌ No puedes agregar el mismo producto más de una vez en el traspaso.'])
+        ->withInput();
+}
 
-        // Detectar tipo de traspaso (almacén general = ID 1)
+    DB::beginTransaction(); // 🔹 Inicio de transacción
+
+    try {
         $tipo = ($request->de_sucursal == 99) ? 'abastecimiento' : 'sucursal';
 
-        // Crear encabezado del traspaso
         $traspaso = Traspaso::create([
-    'de_sucursal' => $request->de_sucursal,
-    'a_sucursal' => $request->a_sucursal,
-    'fecha' => $request->fecha,
-    'observacion' => $request->observacion,
-    'tipo' => $tipo,
-    'estado' => 'pendiente' 
+            'de_sucursal' => $request->de_sucursal,
+            'a_sucursal' => $request->a_sucursal,
+            'fecha' => $request->fecha,
+            'observacion' => $request->observacion,
+            'tipo' => $tipo,
+            'estado' => 'pendiente' 
         ]);
 
-
-        // Recorrer y guardar cada producto
         foreach ($request->productos as $item) {
             $productoId = $item['id_producto'];
             $cantidad = $item['cantidad'];
 
-            // Validar stock en la sucursal origen
             $origen = Inventario::where('id_producto', $productoId)
                 ->where('id_sucursal', $request->de_sucursal)
                 ->first();
 
             if (!$origen || $origen->cantidad < $cantidad) {
-                return back()->withErrors([
-                    'stock' => "❌ Stock insuficiente para el producto ID $productoId."
-                ])->withInput();
+                throw new \Exception("❌ Stock insuficiente para el producto ID $productoId.");
             }
 
-            // Descontar stock de origen
             $origen->cantidad -= $cantidad;
             $origen->save();
 
-            
-
-            // Guardar detalle
             DetalleTraspaso::create([
                 'traspaso_id' => $traspaso->id,
                 'producto_id' => $productoId,
@@ -86,8 +84,14 @@ class TraspasoController extends Controller
             ]);
         }
 
+        DB::commit(); // 🔹 Confirmar cambios
         return redirect()->route('traspasos.index')->with('success', '✅ Traspaso registrado correctamente.');
+
+    } catch (\Exception $e) {
+        DB::rollBack(); // 🔹 Deshacer todo si hay error
+        return back()->withErrors(['error' => $e->getMessage()])->withInput();
     }
+}
 
     public function index()
     {
@@ -266,19 +270,23 @@ public function productosPorSucursal($idSucursal, Request $request)
 {
     $term = strtolower($request->get('term', ''));
 
-    $productos = Producto::whereHas('inventarios', function($q) use ($idSucursal) {
-            $q->where('id_sucursal', $idSucursal);
-        })
-        ->when($term, function($query, $term) {
+    $productos = \DB::table('productos')
+        ->join('inventarios', 'productos.id', '=', 'inventarios.id_producto')
+        ->where('inventarios.id_sucursal', $idSucursal)
+        ->when($term, function ($query, $term) {
             $query->where(function ($sub) use ($term) {
-                $sub->whereRaw('LOWER(nombre) LIKE ?', ["%{$term}%"])
-                    ->orWhereRaw('LOWER(codigo) LIKE ?', ["%{$term}%"]);
+                $sub->whereRaw('LOWER(productos.descripcion) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(productos.item_codigo) LIKE ?', ["%{$term}%"]);
             });
         })
-        ->select('id', DB::raw("CONCAT(codigo, ' - ', nombre) as text"))
+        ->select(
+            'productos.id',
+            \DB::raw("CONCAT(productos.item_codigo, ' - ', productos.descripcion) as text")
+        )
         ->limit(20)
         ->get();
 
     return response()->json($productos);
 }
+
 }

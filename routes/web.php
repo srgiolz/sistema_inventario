@@ -41,7 +41,8 @@ Route::middleware(['auth'])->group(function () {
 
     
     Route::resource('traspasos', TraspasoController::class);
-    Route::get('/api/productos-por-sucursal/{id}', [TraspasoController::class, 'productosPorSucursal']);
+    Route::get('/api/productos-por-sucursal/{idSucursal}', [TraspasoController::class, 'productosPorSucursal'])
+    ->name('api.productosPorSucursal');
 
     // 📄 PDF y revisión de traspasos
     Route::get('/traspasos/{traspaso}/pdf', [TraspasoController::class, 'generarPDF'])->name('traspasos.pdf');

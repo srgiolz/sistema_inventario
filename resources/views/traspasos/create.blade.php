@@ -118,12 +118,12 @@ function inicializarSelect2(sucursalId) {
         placeholder: 'Buscar producto...',
         width: '100%',
         ajax: {
-            url: `/api/productos-por-sucursal/${sucursalId}`,
+            url: "{{ url('/api/productos-por-sucursal') }}/" + sucursalId,
             dataType: 'json',
             delay: 250,
             data: function (params) {
                 return {
-                    term: params.term || '' // 🔹 Enviamos lo que escribe el usuario
+                    term: params.term || ''
                 };
             },
             processResults: function (data) {
