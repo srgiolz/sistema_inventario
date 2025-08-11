@@ -81,11 +81,13 @@ class PanelController extends Controller
         $desde = $request->input('desde') ?? Carbon::now()->startOfMonth()->toDateString();
         $hasta = $request->input('hasta') ?? Carbon::now()->endOfMonth()->toDateString();
 
-        $ventasPorTipoPago = Venta::whereBetween('created_at', [$desde, $hasta])
-            ->select('tipo_pago', DB::raw('SUM(total) as total'))
-            ->groupBy('tipo_pago')
-            ->pluck('total', 'tipo_pago')
-            ->toArray();
+        $ventasPorTipoPago = Venta::join('tipos_pago', 'ventas.tipo_pago_id', '=', 'tipos_pago.id')
+    ->whereBetween('ventas.created_at', [$desde, $hasta])
+    ->where('tipos_pago.activo', 1)
+    ->select('tipos_pago.nombre as tipo_pago', DB::raw('SUM(ventas.total) as total'))
+    ->groupBy('tipos_pago.nombre')
+    ->pluck('total', 'tipo_pago');
+
 
         // 5️⃣ GRÁFICO DE BARRAS - VENTAS POR MES (AÑO ACTUAL)
         $ventasPorMes = Venta::select(
@@ -133,7 +135,7 @@ class PanelController extends Controller
         }
 
         $productosSinVentas30d = $productosSinVentas30d
-            ->with('inventario')
+            ->with('inventarios')
             ->orderBy('descripcion')
             ->get();
 
@@ -190,7 +192,7 @@ class PanelController extends Controller
     }
 
     $productosSinVentas30d = $productos
-        ->with('inventario')
+        ->with('inventarios')
         ->orderBy('descripcion')
         ->get();
 
@@ -201,9 +203,11 @@ public function filtrarVentasPorTipo(Request $request)
     $desde = $request->input('desde') ?? now()->startOfMonth()->toDateString();
     $hasta = $request->input('hasta') ?? now()->endOfMonth()->toDateString();
 
-    $ventasPorTipoPago = \App\Models\Venta::whereBetween('created_at', [$desde, $hasta])
-        ->select('tipo_pago', DB::raw('SUM(total) as total'))
-        ->groupBy('tipo_pago')
+    $ventasPorTipoPago = \App\Models\Venta::join('tipos_pago', 'ventas.tipo_pago_id', '=', 'tipos_pago.id')
+        ->whereBetween('ventas.created_at', [$desde, $hasta])
+        ->where('tipos_pago.activo', 1)
+        ->select('tipos_pago.nombre as tipo_pago', DB::raw('SUM(ventas.total) as total'))
+        ->groupBy('tipos_pago.nombre')
         ->pluck('total', 'tipo_pago');
 
     $resumenHtml = view('panel.partials.ventas-por-tipo', compact('ventasPorTipoPago'))->render();
@@ -214,6 +218,7 @@ public function filtrarVentasPorTipo(Request $request)
         'datos' => $ventasPorTipoPago->values()
     ]);
 }
+
 public function filtrarMovimientos(Request $request)
 {
     $desde = $request->input('desde');
