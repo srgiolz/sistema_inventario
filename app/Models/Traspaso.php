@@ -10,8 +10,8 @@ class Traspaso extends Model
     use HasFactory;
 
     protected $fillable = [
-        'de_sucursal',
-        'a_sucursal',
+        'sucursal_origen_id',  // Cambié 'de_sucursal' por 'sucursal_origen_id'
+        'sucursal_destino_id',  // Cambié 'a_sucursal' por 'sucursal_destino_id'
         'fecha',
         'observacion',
         'tipo',
@@ -22,12 +22,12 @@ class Traspaso extends Model
 
     public function sucursalOrigen()
     {
-        return $this->belongsTo(Sucursal::class, 'de_sucursal');
+        return $this->belongsTo(Sucursal::class, 'sucursal_origen_id');  // Cambié 'de_sucursal' por 'sucursal_origen_id'
     }
 
     public function sucursalDestino()
     {
-        return $this->belongsTo(Sucursal::class, 'a_sucursal');
+        return $this->belongsTo(Sucursal::class, 'sucursal_destino_id');  // Cambié 'a_sucursal' por 'sucursal_destino_id'
     }
 
     public function detalles()

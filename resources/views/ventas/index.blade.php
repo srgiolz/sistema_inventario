@@ -39,7 +39,7 @@
                 @endif
             </td>
             <td>{{ $venta->fecha }}</td>
-            <td>{{ ucfirst($venta->tipo_pago) }}</td>
+            <td>{{ ucfirst($venta->tipoPago->nombre) }}</td> <!-- Cambiado de tipo_pago a tipoPago->nombre -->
             <td>Bs {{ number_format($venta->descuento_total, 2) }}</td>
             <td>Bs {{ number_format($venta->total, 2) }}</td>
             <td>

@@ -18,18 +18,18 @@ class Cliente extends Model
         'ciudad',
         'direccion',
         'telefono',
-        'id_medico',
-        'id_diagnostico'
+        'medico_id',  // Cambié 'id_medico' por 'medico_id'
+        'diagnostico_id'  // Cambié 'id_diagnostico' por 'diagnostico_id'
     ];
 
     public function medico()
     {
-        return $this->belongsTo(Medico::class, 'id_medico');
+        return $this->belongsTo(Medico::class, 'medico_id');  // Cambié 'id_medico' por 'medico_id'
     }
 
     public function diagnostico()
     {
-        return $this->belongsTo(Diagnostico::class, 'id_diagnostico');
+        return $this->belongsTo(Diagnostico::class, 'diagnostico_id');  // Cambié 'id_diagnostico' por 'diagnostico_id'
     }
 
     public function ventas()
@@ -37,3 +37,4 @@ class Cliente extends Model
         return $this->hasMany(Venta::class, 'cliente_id');
     }
 }
+

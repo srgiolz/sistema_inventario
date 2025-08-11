@@ -33,8 +33,8 @@ class ClienteController extends Controller
             'ciudad' => 'nullable|string',
             'direccion' => 'nullable|string',
             'telefono' => 'nullable|string',
-            'id_medico' => 'nullable|exists:medicos,id',
-            'id_diagnostico' => 'nullable|exists:diagnosticos,id',
+            'medico_id' => 'nullable|exists:medicos,id',  // Cambié 'id_medico' por 'medico_id'
+            'diagnostico_id' => 'nullable|exists:diagnosticos,id',  // Cambié 'id_diagnostico' por 'diagnostico_id'
         ]);
 
         Cliente::create($validated);
@@ -51,34 +51,33 @@ class ClienteController extends Controller
 
     public function edit($id)
     {
-    $cliente = Cliente::findOrFail($id);
-    $medicos = Medico::all();
-    $diagnosticos = Diagnostico::all();
+        $cliente = Cliente::findOrFail($id);
+        $medicos = Medico::all();
+        $diagnosticos = Diagnostico::all();
 
-    return view('clientes.edit', compact('cliente', 'medicos', 'diagnosticos'));
+        return view('clientes.edit', compact('cliente', 'medicos', 'diagnosticos'));
     }
     
     public function update(Request $request, $id)
     {
-    $validated = $request->validate([
-        'tipo_cliente' => 'required|in:particular,paciente',
-        'ci_nit' => 'nullable|string',
-        'nombre' => 'required|string',
-        'apellido' => 'nullable|string',
-        'sexo' => 'nullable|string',
-        'ciudad' => 'nullable|string',
-        'direccion' => 'nullable|string',
-        'telefono' => 'nullable|string',
-        'id_medico' => 'nullable|exists:medicos,id',
-        'id_diagnostico' => 'nullable|exists:diagnosticos,id',
-    ]);
+        $validated = $request->validate([
+            'tipo_cliente' => 'required|in:particular,paciente',
+            'ci_nit' => 'nullable|string',
+            'nombre' => 'required|string',
+            'apellido' => 'nullable|string',
+            'sexo' => 'nullable|string',
+            'ciudad' => 'nullable|string',
+            'direccion' => 'nullable|string',
+            'telefono' => 'nullable|string',
+            'medico_id' => 'nullable|exists:medicos,id',  // Cambié 'id_medico' por 'medico_id'
+            'diagnostico_id' => 'nullable|exists:diagnosticos,id',  // Cambié 'id_diagnostico' por 'diagnostico_id'
+        ]);
 
-    $cliente = Cliente::findOrFail($id);
-    $cliente->update($validated);
+        $cliente = Cliente::findOrFail($id);
+        $cliente->update($validated);
 
-    return redirect()->route('clientes.index')->with('success', 'Cliente actualizado correctamente.');
+        return redirect()->route('clientes.index')->with('success', 'Cliente actualizado correctamente.');
     }
-
 }
 
 

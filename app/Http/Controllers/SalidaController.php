@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\DB;
 use App\Models\DetalleSalida;
 use Barryvdh\DomPDF\Facade\Pdf;
 
-
 class SalidaController extends Controller
 {
     public function create()
@@ -20,224 +19,221 @@ class SalidaController extends Controller
         $sucursales = Sucursal::all();
         return view('salidas.create', compact('productos', 'sucursales'));
     }
-public function store(Request $request)
-{
-    $request->validate([
-        'fecha' => 'required|date',
-        'id_sucursal' => 'required|exists:sucursales,id',
-        'tipo' => 'required|string|max:255',
-        'motivo' => 'required|string|max:255',
-        'observacion' => 'nullable|string|max:255',
-        'productos' => 'required|array|min:1',
-        'productos.*.id_producto' => 'required|exists:productos,id',
-        'productos.*.cantidad' => 'required|integer|min:1',
-    ]);
 
-    try {
-        DB::beginTransaction();
-
-        // 1️⃣ Crear la cabecera de salida
-        $salida = Salida::create([
-            'fecha' => $request->fecha,
-            'id_sucursal' => $request->id_sucursal,
-            'tipo' => $request->tipo,
-            'motivo' => $request->motivo,
-            'observacion' => $request->observacion,
+    public function store(Request $request)
+    {
+        $request->validate([
+            'fecha' => 'required|date',
+            'sucursal_id' => 'required|exists:sucursales,id',
+            'tipo' => 'required|string|max:255',
+            'motivo' => 'required|string|max:255',
+            'observacion' => 'nullable|string|max:255',
+            'productos' => 'required|array|min:1',
+            'productos.*.producto_id' => 'required|exists:productos,id',
+            'productos.*.cantidad' => 'required|integer|min:1',
         ]);
 
-        // 2️⃣ Recorrer productos para detalle y stock
-        foreach ($request->productos as $item) {
-            $productoId = $item['id_producto'];
-            $cantidad = $item['cantidad'];
+        try {
+            DB::beginTransaction();
 
-            $inventario = Inventario::where('id_producto', $productoId)
-                ->where('id_sucursal', $request->id_sucursal)
-                ->first();
-
-            if (!$inventario || $inventario->cantidad < $cantidad) {
-                DB::rollBack();
-                return redirect()->back()
-                    ->withErrors(['stock' => "Stock insuficiente para el producto ID: $productoId"])
-                    ->withInput();
-            }
-
-            // Guardar el detalle
-            DetalleSalida::create([
-                'salida_id' => $salida->id,
-                'id_producto' => $productoId,
-                'cantidad' => $cantidad,
+            // 1) Cabecera
+            $salida = Salida::create([
+                'fecha' => $request->fecha,
+                'sucursal_id' => $request->sucursal_id,
+                'tipo' => $request->tipo,
+                'motivo' => $request->motivo,
+                'observacion' => $request->observacion,
             ]);
 
-            // Descontar del inventario
-            $inventario->cantidad -= $cantidad;
-            $inventario->save();
-        }
+            // 2) Detalle + stock
+            foreach ($request->productos as $item) {
+                $productoId = $item['producto_id'];
+                $cantidad = $item['cantidad'];
 
-        DB::commit();
+                $inventario = Inventario::where('producto_id', $productoId)
+                    ->where('sucursal_id', $request->sucursal_id)
+                    ->first();
 
-        return redirect()->route('salidas.index')->with('success', 'Salida registrada exitosamente.');
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return redirect()->back()
-            ->withErrors(['error' => 'Error al registrar la salida: ' . $e->getMessage()])
-            ->withInput();
-    }
-}
-    public function index()
-{
-    $salidas = Salida::with('detalles.producto', 'sucursal')->latest()->get();
+                if (!$inventario || $inventario->cantidad < $cantidad) {
+                    DB::rollBack();
+                    return redirect()->back()
+                        ->withErrors(['stock' => "Stock insuficiente para el producto ID: $productoId"])
+                        ->withInput();
+                }
 
-    // IDs de salidas ya reversadas
-    $idsReversadas = Salida::where('observacion', 'like', 'Reversión de salida #%')
-        ->pluck('observacion')
-        ->map(function ($obs) {
-            return (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT);
-        })
-        ->toArray();
+                DetalleSalida::create([
+                    'salida_id' => $salida->id,
+                    'producto_id' => $productoId,
+                    'cantidad' => $cantidad,
+                ]);
 
-    return view('salidas.index', compact('salidas', 'idsReversadas'));
-}
-public function edit($id)
-{
-    $salida = Salida::with('detalles')->findOrFail($id);
-
-    // Validar que la salida sea del mismo día
-    if (!\Carbon\Carbon::parse($salida->fecha)->isToday()) {
-        return redirect()->route('salidas.index')->with('error', 'Solo puedes editar salidas del mismo día.');
-    }
-
-    $productos = Producto::all();
-    $sucursales = Sucursal::all();
-
-    return view('salidas.edit', compact('salida', 'productos', 'sucursales'));
-}
-
-public function update(Request $request, $id)
-{
-    $salida = Salida::findOrFail($id);
-
-    // Restricción: solo editar si es del mismo día
-    if (!\Carbon\Carbon::parse($salida->fecha)->isToday()) {
-        return redirect()->route('salidas.index')->with('error', 'Solo se pueden editar salidas del mismo día.');
-    }
-
-    // Validaciones
-    $request->validate([
-        'fecha' => 'required|date',
-        'id_sucursal' => 'required|exists:sucursales,id',
-        'tipo' => 'required|string|max:255',
-        'motivo' => 'required|string|max:255',
-        'observacion' => 'nullable|string|max:255',
-        'productos' => 'required|array|min:1',
-        'productos.*.id_producto' => 'required|exists:productos,id',
-        'productos.*.cantidad' => 'required|integer|min:1',
-    ]);
-
-    DB::transaction(function () use ($request, $salida) {
-        // Revertir stock anterior
-        foreach ($salida->detalles as $detalle) {
-            $inventario = Inventario::where('id_producto', $detalle->id_producto)
-                ->where('id_sucursal', $salida->id_sucursal)
-                ->first();
-            if ($inventario) {
-                $inventario->cantidad += $detalle->cantidad; // devolver stock
+                $inventario->cantidad -= $cantidad;
                 $inventario->save();
             }
-            $detalle->delete();
+
+            DB::commit();
+
+            return redirect()->route('salidas.index')->with('success', 'Salida registrada exitosamente.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->withErrors(['error' => 'Error al registrar la salida: ' . $e->getMessage()])
+                ->withInput();
+        }
+    }
+
+    public function index()
+    {
+        $salidas = Salida::with('detalles.producto', 'sucursal')->latest()->get();
+
+        // IDs de salidas ya reversadas (por observacion)
+        $idsReversadas = Salida::where('observacion', 'like', 'Reversión de salida #%')
+            ->pluck('observacion')
+            ->map(function ($obs) {
+                return (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT);
+            })
+            ->toArray();
+
+        return view('salidas.index', compact('salidas', 'idsReversadas'));
+    }
+
+    public function edit($id)
+    {
+        $salida = Salida::with('detalles')->findOrFail($id);
+
+        if (!\Carbon\Carbon::parse($salida->fecha)->isToday()) {
+            return redirect()->route('salidas.index')->with('error', 'Solo puedes editar salidas del mismo día.');
         }
 
-        // Actualizar cabecera
-        $salida->update([
-            'fecha' => $request->fecha,
-            'id_sucursal' => $request->id_sucursal,
-            'tipo' => $request->tipo,
-            'motivo' => $request->motivo,
-            'observacion' => $request->observacion,
+        $productos = Producto::all();
+        $sucursales = Sucursal::all();
+
+        return view('salidas.edit', compact('salida', 'productos', 'sucursales'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $salida = Salida::findOrFail($id);
+
+        if (!\Carbon\Carbon::parse($salida->fecha)->isToday()) {
+            return redirect()->route('salidas.index')->with('error', 'Solo se pueden editar salidas del mismo día.');
+        }
+
+        $request->validate([
+            'fecha' => 'required|date',
+            'sucursal_id' => 'required|exists:sucursales,id',
+            'tipo' => 'required|string|max:255',
+            'motivo' => 'required|string|max:255',
+            'observacion' => 'nullable|string|max:255',
+            'productos' => 'required|array|min:1',
+            'productos.*.producto_id' => 'required|exists:productos,id',
+            'productos.*.cantidad' => 'required|integer|min:1',
         ]);
 
-        // Registrar nuevos detalles y descontar stock
-        foreach ($request->productos as $item) {
-            $inventario = Inventario::where('id_producto', $item['id_producto'])
-                ->where('id_sucursal', $request->id_sucursal)
-                ->first();
-
-            if (!$inventario || $inventario->cantidad < $item['cantidad']) {
-                throw new \Exception("Stock insuficiente para el producto ID: {$item['id_producto']}");
+        DB::transaction(function () use ($request, $salida) {
+            // Revertir stock anterior
+            foreach ($salida->detalles as $detalle) {
+                $inventario = Inventario::where('producto_id', $detalle->producto_id)
+                    ->where('sucursal_id', $salida->sucursal_id)
+                    ->first();
+                if ($inventario) {
+                    $inventario->cantidad += $detalle->cantidad;
+                    $inventario->save();
+                }
+                $detalle->delete();
             }
 
-            DetalleSalida::create([
-                'salida_id' => $salida->id,
-                'id_producto' => $item['id_producto'],
-                'cantidad' => $item['cantidad'],
+            // Actualizar cabecera
+            $salida->update([
+                'fecha' => $request->fecha,
+                'sucursal_id' => $request->sucursal_id,
+                'tipo' => $request->tipo,
+                'motivo' => $request->motivo,
+                'observacion' => $request->observacion,
             ]);
 
-            $inventario->cantidad -= $item['cantidad'];
-            $inventario->save();
+            // Nuevos detalles + descuento stock
+            foreach ($request->productos as $item) {
+                $inventario = Inventario::where('producto_id', $item['producto_id'])
+                    ->where('sucursal_id', $request->sucursal_id)
+                    ->first();
+
+                if (!$inventario || $inventario->cantidad < $item['cantidad']) {
+                    throw new \Exception("Stock insuficiente para el producto ID: {$item['producto_id']}");
+                }
+
+                DetalleSalida::create([
+                    'salida_id' => $salida->id,
+                    'producto_id' => $item['producto_id'],
+                    'cantidad' => $item['cantidad'],
+                ]);
+
+                $inventario->cantidad -= $item['cantidad'];
+                $inventario->save();
+            }
+        });
+
+        return redirect()->route('salidas.index')->with('success', 'Salida actualizada correctamente.');
+    }
+
+    public function generarPdf($id)
+    {
+        $salida = Salida::with(['sucursal', 'detalles.producto'])->findOrFail($id);
+
+        $pdf = Pdf::loadView('salidas.pdf', compact('salida'))
+            ->setPaper('A4', 'portrait');
+
+        return $pdf->stream('Salida_'.$salida->id.'.pdf');
+    }
+
+    public function reversar($id)
+    {
+        $salidaOriginal = Salida::with('detalles.producto')->findOrFail($id);
+
+        // Ya existe reversa (por observación)
+        $existeReversa = Salida::where('observacion', 'like', 'Reversión de salida #%')
+            ->where('observacion', 'like', '%'.$salidaOriginal->id.'%')
+            ->exists();
+        if ($existeReversa) {
+            return redirect()->route('salidas.index')->with('error', 'Esta salida ya fue reversada.');
         }
-    });
 
-    return redirect()->route('salidas.index')->with('success', 'Salida actualizada correctamente.');
-}
+        // Límite 7 días
+        $diasTranscurridos = \Carbon\Carbon::parse($salidaOriginal->fecha)->diffInDays(now());
+        if ($diasTranscurridos > 7) {
+            return redirect()->route('salidas.index')->with('error', 'Solo puedes reversar salidas dentro de los 7 días posteriores a su registro.');
+        }
 
-public function generarPdf($id)
-{
-    $salida = Salida::with(['sucursal', 'detalles.producto'])->findOrFail($id);
-
-    $pdf = Pdf::loadView('salidas.pdf', compact('salida'))
-        ->setPaper('A4', 'portrait');
-
-    return $pdf->stream('Salida_'.$salida->id.'.pdf');
-}
-public function reversar($id)
-{
-    $salidaOriginal = Salida::with('detalles.producto')->findOrFail($id);
-
-    // 1️⃣ Validar si ya existe reversa
-    $existeReversa = Salida::where('observacion', 'like', 'Reversión de salida #%')
-        ->where('observacion', 'like', '%'.$salidaOriginal->id.'%')
-        ->exists();
-    if ($existeReversa) {
-        return redirect()->route('salidas.index')->with('error', 'Esta salida ya fue reversada.');
-    }
-
-    // 2️⃣ Validar límite de tiempo (7 días)
-    $diasTranscurridos = \Carbon\Carbon::parse($salidaOriginal->fecha)->diffInDays(now());
-    if ($diasTranscurridos > 7) {
-        return redirect()->route('salidas.index')->with('error', 'Solo puedes reversar salidas dentro de los 7 días posteriores a su registro.');
-    }
-
-    // 3️⃣ Proceso de reversa
-    DB::transaction(function () use ($salidaOriginal) {
-        $salidaReversa = Salida::create([
-            'fecha' => now()->format('Y-m-d'),
-            'id_sucursal' => $salidaOriginal->id_sucursal,
-            'tipo' => $salidaOriginal->tipo,
-            'motivo' => $salidaOriginal->motivo,
-            'observacion' => 'Reversión de salida #' . $salidaOriginal->id,
-        ]);
-
-        foreach ($salidaOriginal->detalles as $detalle) {
-            // Guardar detalle en reversa (cantidad positiva)
-            DetalleSalida::create([
-                'salida_id' => $salidaReversa->id,
-                'id_producto' => $detalle->id_producto,
-                'cantidad' => $detalle->cantidad
+        // Proceso de reversa
+        DB::transaction(function () use ($salidaOriginal) {
+            $salidaReversa = Salida::create([
+                'fecha' => now()->format('Y-m-d'),
+                'sucursal_id' => $salidaOriginal->sucursal_id,
+                'tipo' => $salidaOriginal->tipo,
+                'motivo' => $salidaOriginal->motivo,
+                'observacion' => 'Reversión de salida #' . $salidaOriginal->id,
             ]);
 
-            // Sumar al inventario
-            $inventario = Inventario::firstOrCreate(
-                [
-                    'id_producto' => $detalle->id_producto,
-                    'id_sucursal' => $salidaOriginal->id_sucursal
-                ],
-                ['cantidad' => 0]
-            );
+            foreach ($salidaOriginal->detalles as $detalle) {
+                DetalleSalida::create([
+                    'salida_id' => $salidaReversa->id,
+                    'producto_id' => $detalle->producto_id,
+                    'cantidad' => $detalle->cantidad
+                ]);
 
-            $inventario->cantidad += $detalle->cantidad;
-            $inventario->save();
-        }
-    });
+                $inventario = Inventario::firstOrCreate(
+                    [
+                        'producto_id' => $detalle->producto_id,
+                        'sucursal_id' => $salidaOriginal->sucursal_id
+                    ],
+                    ['cantidad' => 0]
+                );
 
-    return redirect()->route('salidas.index')->with('success', 'Salida reversada correctamente.');
-}
+                $inventario->cantidad += $detalle->cantidad;
+                $inventario->save();
+            }
+        });
+
+        return redirect()->route('salidas.index')->with('success', 'Salida reversada correctamente.');
+    }
 }

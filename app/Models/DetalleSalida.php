@@ -13,7 +13,7 @@ class DetalleSalida extends Model
 
     protected $fillable = [
         'salida_id',
-        'id_producto',
+        'producto_id',  // Cambié 'id_producto' por 'producto_id'
         'cantidad',
     ];
 
@@ -24,6 +24,6 @@ class DetalleSalida extends Model
 
     public function producto()
     {
-        return $this->belongsTo(Producto::class, 'id_producto');
+        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
     }
 }

@@ -7,7 +7,7 @@
     <p><strong>Cliente:</strong> {{ $venta->cliente->nombre }} {{ $venta->cliente->apellido }}</p>
     <p><strong>Sucursal:</strong> {{ $venta->sucursal->nombre }}</p>
     <p><strong>Fecha:</strong> {{ $venta->fecha }}</p>
-    <p><strong>Tipo de Pago:</strong> {{ ucfirst($venta->tipo_pago) }}</p>
+    <p><strong>Tipo de Pago:</strong> {{ ucfirst($venta->tipoPago->nombre) }}</p> <!-- Cambiado de tipo_pago a tipoPago->nombre -->
     <p><strong>Factura:</strong>
     @if($venta->con_factura)
         <span class="badge bg-success">Con factura</span>

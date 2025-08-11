@@ -12,8 +12,8 @@ class DetalleVenta extends Model
     protected $table = 'detalle_ventas'; // nombre exacto de la tabla
 
     protected $fillable = [
-        'id_venta',
-        'id_producto',
+        'venta_id',  // Cambié 'id_venta' por 'venta_id'
+        'producto_id',  // Cambié 'id_producto' por 'producto_id'
         'cantidad',
         'precio_unitario',
         'descuento',
@@ -22,16 +22,16 @@ class DetalleVenta extends Model
 
     public function venta()
     {
-        return $this->belongsTo(Venta::class, 'id_venta');
+        return $this->belongsTo(Venta::class, 'venta_id');  // Cambié 'id_venta' por 'venta_id'
     }
 
     public function producto()
     {
-        return $this->belongsTo(Producto::class, 'id_producto');
-    }
-    public function detalles()
-    {
-    return $this->hasMany(DetalleVenta::class, 'id_venta');
+        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
     }
 
+    public function detalles()
+    {
+        return $this->hasMany(DetalleVenta::class, 'venta_id');  // Cambié 'id_venta' por 'venta_id'
+    }
 }

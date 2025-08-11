@@ -16,7 +16,7 @@
         <!-- CLIENTE -->
         <div class="mb-3">
             <label>Cliente:</label>
-            <select name="id_cliente" id="id_cliente" class="form-select compacto-input" required>
+            <select name="cliente_id" id="id_cliente" class="form-select compacto-input" required>
                 <option value="">-- Selecciona un cliente --</option>
                 @foreach($clientes as $cliente)
                     <option value="{{ $cliente->id }}">
@@ -29,7 +29,7 @@
         <!-- SUCURSAL -->
         <div class="mb-3">
             <label>Sucursal:</label>
-            <select name="id_sucursal" id="id_sucursal" class="form-select compacto-input" required>
+            <select name="sucursal_id" id="id_sucursal" class="form-select compacto-input" required>
                 @foreach($sucursales as $sucursal)
                     <option value="{{ $sucursal->id }}">{{ $sucursal->nombre }}</option>
                 @endforeach
@@ -41,12 +41,12 @@
         <div id="productos-container">
             <div class="producto-item row gx-2 align-items-end mb-2 border-bottom pb-2">
                 <div class="col-md-4">
-                    <select name="productos[0][id_producto]" class="form-select producto-select" required>
+                    <select name="productos[0][producto_id]" class="form-select producto-select" required>
                         <option value="">-- Producto --</option>
                         @foreach($productos as $producto)
                             <option value="{{ $producto->id }}"
                                 data-precio="{{ $producto->precio_venta }}"
-                                data-inventarios='@json($producto->inventarios->mapWithKeys(fn($inv) => [$inv->id_sucursal => $inv->cantidad]))'>
+                                data-inventarios='@json($producto->inventarios->mapWithKeys(fn($inv) => [$inv->sucursal_id => $inv->cantidad]))'>
                                 {{ $producto->descripcion }}
                             </option>
                         @endforeach
@@ -90,22 +90,22 @@
         <!-- TIPO DE PAGO -->
         <div class="mb-3">
             <label>Tipo de pago:</label>
-            <select name="tipo_pago" class="form-select" required>
+            <select name="tipo_pago_id" class="form-select" required>
                 <option value="">-- Selecciona --</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="QR">QR</option>
-                <option value="tarjeta">Tarjeta</option>
+                <option value="1">Efectivo</option>
+                <option value="2">QR</option>
+                <option value="3">Tarjeta</option>
             </select>
         </div>
+
         <!-- CON FACTURA -->
         <div class="mb-3">
-        <label>¿Venta con factura?</label>
-        <select name="con_factura" class="form-select" required>
-        <option value="1">Sí</option>
-        <option value="0" selected>No</option>
-        </select>
+            <label>¿Venta con factura?</label>
+            <select name="con_factura" class="form-select" required>
+                <option value="1">Sí</option>
+                <option value="0" selected>No</option>
+            </select>
         </div>
-
 
         <button type="submit" class="btn btn-primary" id="btn-guardar">Guardar Venta</button>
     </form>
@@ -122,13 +122,13 @@ $(document).ready(function () {
     let index = 1;
 
     function generarSelectProducto(index) {
-        let select = `<select name="productos[${index}][id_producto]" class="form-select producto-select" required>
+        let select = `<select name="productos[${index}][producto_id]" class="form-select producto-select" required>
             <option value="">-- Producto --</option>`;
 
         @foreach($productos as $producto)
             select += `<option value="{{ $producto->id }}"
                         data-precio="{{ $producto->precio_venta }}"
-                        data-inventarios='@json($producto->inventarios->mapWithKeys(fn($inv) => [$inv->id_sucursal => $inv->cantidad]))'>
+                        data-inventarios='@json($producto->inventarios->mapWithKeys(fn($inv) => [$inv->sucursal_id => $inv->cantidad]))'>
                         {{ $producto->descripcion }}
                     </option>`;
         @endforeach
@@ -210,7 +210,7 @@ $(document).ready(function () {
 
         const clienteId = $('#id_cliente').val();
         const clienteTexto = $('#id_cliente option:selected').text().trim();
-        const tipoPago = $('select[name="tipo_pago"]').val();
+        const tipoPago = $('select[name="tipo_pago_id"]').val();
         const total = $('#total').val() || '0.00';
 
         if (!clienteId) {
@@ -259,6 +259,7 @@ $(document).ready(function () {
 });
 </script>
 @endpush
+
 
 
 

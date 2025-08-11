@@ -55,7 +55,7 @@ class PanelController extends Controller
             ? $ventasMesActual->sum('total') / $ventasMesActual->count()
             : 0;
 
-        $productosVendidosMes = DetalleVenta::join('ventas', 'detalle_ventas.id_venta', '=', 'ventas.id')
+        $productosVendidosMes = DetalleVenta::join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')  // Cambié 'id_venta' por 'venta_id'
             ->whereMonth('ventas.created_at', $mesActual)
             ->sum('detalle_ventas.cantidad');
 
@@ -81,13 +81,12 @@ class PanelController extends Controller
         $desde = $request->input('desde') ?? Carbon::now()->startOfMonth()->toDateString();
         $hasta = $request->input('hasta') ?? Carbon::now()->endOfMonth()->toDateString();
 
-        $ventasPorTipoPago = Venta::join('tipos_pago', 'ventas.tipo_pago_id', '=', 'tipos_pago.id')
-    ->whereBetween('ventas.created_at', [$desde, $hasta])
-    ->where('tipos_pago.activo', 1)
-    ->select('tipos_pago.nombre as tipo_pago', DB::raw('SUM(ventas.total) as total'))
-    ->groupBy('tipos_pago.nombre')
-    ->pluck('total', 'tipo_pago');
-
+        $ventasPorTipoPago = Venta::join('tipos_pago', 'ventas.tipo_pago_id', '=', 'tipos_pago.id')  // Cambié 'tipo_pago' por 'tipo_pago_id'
+            ->whereBetween('ventas.created_at', [$desde, $hasta])
+            ->where('tipos_pago.activo', 1)
+            ->select('tipos_pago.nombre as tipo_pago', DB::raw('SUM(ventas.total) as total'))
+            ->groupBy('tipos_pago.nombre')
+            ->pluck('total', 'tipo_pago');
 
         // 5️⃣ GRÁFICO DE BARRAS - VENTAS POR MES (AÑO ACTUAL)
         $ventasPorMes = Venta::select(
@@ -105,8 +104,8 @@ class PanelController extends Controller
         $datos = $ventasPorMes->pluck('total');
 
         // 6️⃣ TOP PRODUCTOS MÁS VENDIDOS DEL MES
-        $topProductos = DetalleVenta::join('productos', 'detalle_ventas.id_producto', '=', 'productos.id')
-            ->join('ventas', 'detalle_ventas.id_venta', '=', 'ventas.id')
+        $topProductos = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'id_producto' por 'producto_id'
+            ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')
             ->whereMonth('ventas.created_at', now()->month)
             ->select('productos.descripcion', DB::raw('SUM(detalle_ventas.cantidad) as total_vendidos'))
             ->groupBy('productos.descripcion')
@@ -124,9 +123,9 @@ class PanelController extends Controller
             ->pluck('linea');
 
         $productosSinVentas30d = Producto::whereNotIn('id', function ($query) {
-            $query->select('id_producto')
+            $query->select('producto_id')  // Cambié 'id_producto' por 'producto_id'
                 ->from('detalle_ventas')
-                ->join('ventas', 'detalle_ventas.id_venta', '=', 'ventas.id')
+                ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')  // Cambié 'id_venta' por 'venta_id'
                 ->where('ventas.created_at', '>=', now()->subDays(30));
         });
 
@@ -139,7 +138,7 @@ class PanelController extends Controller
             ->orderBy('descripcion')
             ->get();
 
-        $productosMayorRotacion = DetalleVenta::join('productos', 'detalle_ventas.id_producto', '=', 'productos.id')
+        $productosMayorRotacion = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'id_producto' por 'producto_id'
             ->select('productos.descripcion', DB::raw('SUM(cantidad) as total_vendidos'))
             ->groupBy('productos.descripcion')
             ->orderByDesc('total_vendidos')
@@ -174,72 +173,73 @@ class PanelController extends Controller
             'lineas',
             'lineaId'
         ));
-        
     }
+
     public function filtrarProductosSinVentas(Request $request)
-{
-    $lineaId = $request->input('linea_id');
+    {
+        $lineaId = $request->input('linea_id');
 
-    $productos = Producto::whereNotIn('id', function ($query) {
-        $query->select('id_producto')
-            ->from('detalle_ventas')
-            ->join('ventas', 'detalle_ventas.id_venta', '=', 'ventas.id')
-            ->where('ventas.created_at', '>=', now()->subDays(30));
-    });
-
-    if ($lineaId) {
-        $productos->where('linea', $lineaId);
-    }
-
-    $productosSinVentas30d = $productos
-        ->with('inventarios')
-        ->orderBy('descripcion')
-        ->get();
-
-    return view('panel.partials.productos-sin-venta', compact('productosSinVentas30d'));
-}
-public function filtrarVentasPorTipo(Request $request)
-{
-    $desde = $request->input('desde') ?? now()->startOfMonth()->toDateString();
-    $hasta = $request->input('hasta') ?? now()->endOfMonth()->toDateString();
-
-    $ventasPorTipoPago = \App\Models\Venta::join('tipos_pago', 'ventas.tipo_pago_id', '=', 'tipos_pago.id')
-        ->whereBetween('ventas.created_at', [$desde, $hasta])
-        ->where('tipos_pago.activo', 1)
-        ->select('tipos_pago.nombre as tipo_pago', DB::raw('SUM(ventas.total) as total'))
-        ->groupBy('tipos_pago.nombre')
-        ->pluck('total', 'tipo_pago');
-
-    $resumenHtml = view('panel.partials.ventas-por-tipo', compact('ventasPorTipoPago'))->render();
-
-    return response()->json([
-        'html' => $resumenHtml,
-        'labels' => $ventasPorTipoPago->keys(),
-        'datos' => $ventasPorTipoPago->values()
-    ]);
-}
-
-public function filtrarMovimientos(Request $request)
-{
-    $desde = $request->input('desde');
-    $hasta = $request->input('hasta');
-
-    $movimientos = \App\Models\MovimientoStock::query()
-        ->when($desde, fn($q) => $q->whereDate('fecha', '>=', $desde))
-        ->when($hasta, fn($q) => $q->whereDate('fecha', '<=', $hasta))
-        ->latest()
-        ->limit(30)
-        ->get()
-        ->map(function ($m) {
-            return (object)[
-                'fecha' => $m->fecha,
-                'tipo' => $m->tipo,
-                'producto' => $m->producto->descripcion ?? '—',
-                'cantidad' => $m->cantidad,
-                'sucursal' => $m->sucursal->nombre ?? '—',
-            ];
+        $productos = Producto::whereNotIn('id', function ($query) {
+            $query->select('producto_id')  // Cambié 'id_producto' por 'producto_id'
+                ->from('detalle_ventas')
+                ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')  // Cambié 'id_venta' por 'venta_id'
+                ->where('ventas.created_at', '>=', now()->subDays(30));
         });
 
-    return view('panel.partials.movimientos-stock', compact('movimientos'));
-}
+        if ($lineaId) {
+            $productos->where('linea', $lineaId);
+        }
+
+        $productosSinVentas30d = $productos
+            ->with('inventarios')
+            ->orderBy('descripcion')
+            ->get();
+
+        return view('panel.partials.productos-sin-venta', compact('productosSinVentas30d'));
+    }
+
+    public function filtrarVentasPorTipo(Request $request)
+    {
+        $desde = $request->input('desde') ?? now()->startOfMonth()->toDateString();
+        $hasta = $request->input('hasta') ?? now()->endOfMonth()->toDateString();
+
+        $ventasPorTipoPago = \App\Models\Venta::join('tipos_pago', 'ventas.tipo_pago_id', '=', 'tipos_pago.id')  // Cambié 'tipo_pago_id' por 'tipo_pago'
+            ->whereBetween('ventas.created_at', [$desde, $hasta])
+            ->where('tipos_pago.activo', 1)
+            ->select('tipos_pago.nombre as tipo_pago', DB::raw('SUM(ventas.total) as total'))
+            ->groupBy('tipos_pago.nombre')
+            ->pluck('total', 'tipo_pago');
+
+        $resumenHtml = view('panel.partials.ventas-por-tipo', compact('ventasPorTipoPago'))->render();
+
+        return response()->json([
+            'html' => $resumenHtml,
+            'labels' => $ventasPorTipoPago->keys(),
+            'datos' => $ventasPorTipoPago->values()
+        ]);
+    }
+
+    public function filtrarMovimientos(Request $request)
+    {
+        $desde = $request->input('desde');
+        $hasta = $request->input('hasta');
+
+        $movimientos = \App\Models\MovimientoStock::query()
+            ->when($desde, fn($q) => $q->whereDate('fecha', '>=', $desde))
+            ->when($hasta, fn($q) => $q->whereDate('fecha', '<=', $hasta))
+            ->latest()
+            ->limit(30)
+            ->get()
+            ->map(function ($m) {
+                return (object)[
+                    'fecha' => $m->fecha,
+                    'tipo' => $m->tipo,
+                    'producto' => $m->producto->descripcion ?? '—',
+                    'cantidad' => $m->cantidad,
+                    'sucursal' => $m->sucursal->nombre ?? '—',
+                ];
+            });
+
+        return view('panel.partials.movimientos-stock', compact('movimientos'));
+    }
 }

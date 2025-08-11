@@ -9,15 +9,16 @@ class Inventario extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['id_producto', 'id_sucursal', 'cantidad'];
+    protected $fillable = ['producto_id', 'sucursal_id', 'cantidad'];  // Cambié 'id_producto' por 'producto_id' y 'id_sucursal' por 'sucursal_id'
 
     public function producto()
     {
-        return $this->belongsTo(Producto::class, 'id_producto');
+        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
     }
 
     public function sucursal()
     {
-        return $this->belongsTo(Sucursal::class, 'id_sucursal');
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
     }
 }
+

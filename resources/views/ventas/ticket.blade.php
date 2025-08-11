@@ -43,7 +43,7 @@
         <strong>Cliente:</strong> {{ $venta->cliente->nombre }} {{ $venta->cliente->apellido }}<br>
         <strong>Sucursal:</strong> {{ $venta->sucursal->nombre }}<br>
         <strong>Fecha:</strong> {{ $venta->fecha->format('d/m/Y H:i') }}<br>
-        <strong>Pago:</strong> {{ ucfirst($venta->tipo_pago) }}<br>
+        <strong>Pago:</strong> {{ ucfirst($venta->tipoPago->nombre) }}<br> <!-- Cambiado de tipo_pago a tipoPago->nombre -->
         <strong>Factura:</strong>
         @if($venta->con_factura)
             <span style="color: green;">Con factura</span>
@@ -82,3 +82,4 @@
 
 </body>
 </html>
+

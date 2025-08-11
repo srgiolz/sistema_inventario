@@ -13,10 +13,15 @@ class Venta extends Model
         'cliente_id',
         'sucursal_id',
         'fecha',
-        'tipo_pago',
+        'tipo_pago_id',   // <-- nombre correcto en BD
         'descuento_total',
         'total',
-        'con_factura'
+        'con_factura',
+    ];
+
+    protected $casts = [
+        'con_factura' => 'boolean',
+        'fecha' => 'datetime',
     ];
 
     public function cliente()
@@ -29,10 +34,16 @@ class Venta extends Model
         return $this->belongsTo(Sucursal::class, 'sucursal_id');
     }
 
-    // Cambiar a "detalles" para coincidir con la vista
     public function detalles()
     {
-        return $this->hasMany(DetalleVenta::class, 'id_venta');
+        // en detalle_ventas la FK es 'venta_id'
+        return $this->hasMany(DetalleVenta::class, 'venta_id');
+    }
+
+    public function tipoPago()
+    {
+        // relación correcta hacia tipos_pago por 'tipo_pago_id'
+        return $this->belongsTo(TipoPago::class, 'tipo_pago_id');
     }
 }
 

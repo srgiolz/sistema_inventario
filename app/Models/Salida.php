@@ -9,11 +9,11 @@ class Salida extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['id_sucursal', 'fecha', 'motivo', 'observacion', 'tipo'];
+    protected $fillable = ['sucursal_id', 'fecha', 'motivo', 'observacion', 'tipo'];  // Cambié 'id_sucursal' por 'sucursal_id'
 
     public function sucursal()
     {
-        return $this->belongsTo(Sucursal::class, 'id_sucursal');
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
     }
 
     public function detalles()
