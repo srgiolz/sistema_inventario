@@ -1,0 +1,1624 @@
+--- a/app/Http/Controllers/EntradaController.php
++++ b/app/Http/Controllers/EntradaController.php
+@@ -38,11 +38,11 @@
+     public function store(Request $request)
+
+     {
+
+         $request->validate([
+
+-            'sucursal_id' => 'required|exists:sucursales,id',  // Cambié 'id_sucursal' por 'sucursal_id'
+
++            'sucursal_id' => 'required|exists:sucursales,id',  // Cambié 'sucursal_id' por 'sucursal_id'
+
+             'fecha' => 'required|date',
+
+             'tipo' => 'required|string|max:100',
+
+             'observacion' => 'nullable|string|max:255',
+
+-            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'id_producto' por 'producto_id'
+
++            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'producto_id' por 'producto_id'
+
+             'productos.*.cantidad' => 'required|integer|min:1',
+
+             'productos.*.precio_unitario' => 'nullable|numeric|min:0',
+
+         ]);
+
+@@ -50,7 +50,7 @@
+         DB::transaction(function () use ($request) {
+
+             // Crear entrada general
+
+             $entrada = Entrada::create([
+
+-                'sucursal_id' => $request->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+
++                'sucursal_id' => $request->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                 'fecha' => $request->fecha,
+
+                 'tipo' => $request->tipo,
+
+                 'observacion' => $request->observacion,
+
+@@ -60,7 +60,7 @@
+             foreach ($request->productos as $producto) {
+
+                 DetalleEntrada::create([
+
+                     'entrada_id' => $entrada->id,
+
+-                    'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
+
++                    'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+
+                     'cantidad' => $producto['cantidad'],
+
+                     'precio_unitario' => $producto['precio_unitario'] ?? null,
+
+                 ]);
+
+@@ -68,8 +68,8 @@
+                 // Actualizar inventario
+
+                 $inventario = Inventario::firstOrCreate(
+
+                     [
+
+-                        'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
+
+-                        'sucursal_id' => $request->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+
++                        'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+
++                        'sucursal_id' => $request->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                     ],
+
+                     ['cantidad' => 0]
+
+                 );
+
+@@ -90,10 +90,10 @@
+         // VALIDACIÓN GLOBAL POR PRODUCTO
+
+         foreach ($entradaOriginal->detalles as $detalle) {
+
+             // 1. Verificar si existe otra entrada posterior del mismo producto
+
+-            $hayOtraEntradaPosterior = Entrada::where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+
++            $hayOtraEntradaPosterior = Entrada::where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                 ->where('fecha', '>', $entradaOriginal->fecha)
+
+                 ->whereHas('detalles', function ($q) use ($detalle) {
+
+-                    $q->where('producto_id', $detalle->producto_id);  // Cambié 'id_producto' por 'producto_id'
+
++                    $q->where('producto_id', $detalle->producto_id);  // Cambié 'producto_id' por 'producto_id'
+
+                 })
+
+                 ->exists();
+
+ 
+
+@@ -102,8 +102,8 @@
+             }
+
+ 
+
+             // 2. Verificar si el stock actual alcanza para reversar
+
+-            $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'id_producto' por 'producto_id'
+
+-                ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+
++            $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
+
++                ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                 ->first();
+
+ 
+
+             if (!$inventario || $inventario->cantidad < $detalle->cantidad) {
+
+@@ -114,7 +114,7 @@
+         // 🛠 Proceso de reversa si pasa la validación
+
+         DB::transaction(function () use ($entradaOriginal) {
+
+             $entradaReversa = Entrada::create([
+
+-                'sucursal_id' => $entradaOriginal->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+
++                'sucursal_id' => $entradaOriginal->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                 'fecha' => now()->format('Y-m-d'),
+
+                 'tipo' => $entradaOriginal->tipo,
+
+                 'observacion' => 'Reversión de entrada #' . $entradaOriginal->id,
+
+@@ -123,13 +123,13 @@
+             foreach ($entradaOriginal->detalles as $detalle) {
+
+                 DetalleEntrada::create([
+
+                     'entrada_id' => $entradaReversa->id,
+
+-                    'producto_id' => $detalle->producto_id,  // Cambié 'id_producto' por 'producto_id'
+
++                    'producto_id' => $detalle->producto_id,  // Cambié 'producto_id' por 'producto_id'
+
+                     'cantidad' => -1 * $detalle->cantidad,
+
+                     'precio_unitario' => $detalle->precio_unitario,
+
+                 ]);
+
+ 
+
+-                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'id_producto' por 'producto_id'
+
+-                    ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+
++                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
+
++                    ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                     ->first();
+
+ 
+
+                 if ($inventario) {
+
+@@ -172,13 +172,13 @@
+             'tipo' => 'required|string|max:100',
+
+             'observacion' => 'nullable|string|max:255',
+
+             'productos' => 'required|array|min:1',
+
+-            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'id_producto' por 'producto_id'
+
++            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'producto_id' por 'producto_id'
+
+             'productos.*.cantidad' => 'required|numeric|min:1',
+
+             'productos.*.precio_unitario' => 'nullable|numeric|min:0',
+
+         ]);
+
+ 
+
+         // Validar productos duplicados
+
+-        $productosIds = collect($request->productos)->pluck('producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        $productosIds = collect($request->productos)->pluck('producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+         if ($productosIds->duplicates()->isNotEmpty()) {
+
+             return back()->withErrors(['productos' => 'No se permiten productos duplicados.'])->withInput();
+
+         }
+
+@@ -193,8 +193,8 @@
+ 
+
+             // Revertir stock de los detalles anteriores (si manejas stock dinámico)
+
+             foreach ($entrada->detalles as $detalle) {
+
+-                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'id_producto' por 'producto_id'
+
+-                    ->where('sucursal_id', $entrada->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+
++                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
+
++                    ->where('sucursal_id', $entrada->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                     ->first();
+
+ 
+
+                 if ($inventario) {
+
+@@ -208,7 +208,7 @@
+             // Registrar los nuevos productos y ajustar inventario
+
+             foreach ($request->productos as $producto) {
+
+                 $detalle = $entrada->detalles()->create([
+
+-                    'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
+
++                    'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+
+                     'cantidad' => $producto['cantidad'],
+
+                     'precio_unitario' => $producto['precio_unitario'] ?? 0,
+
+                 ]);
+
+@@ -216,8 +216,8 @@
+                 // Aumentar stock
+
+                 $inventario = Inventario::firstOrCreate(
+
+                     [
+
+-                        'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
+
+-                        'sucursal_id' => $entrada->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+
++                        'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+
++                        'sucursal_id' => $entrada->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                     ],
+
+                     ['cantidad' => 0]
+
+                 );
+
+--- a/app/Http/Controllers/PanelController.php
++++ b/app/Http/Controllers/PanelController.php
+@@ -104,7 +104,7 @@
+         $datos = $ventasPorMes->pluck('total');
+
+ 
+
+         // 6️⃣ TOP PRODUCTOS MÁS VENDIDOS DEL MES
+
+-        $topProductos = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'id_producto' por 'producto_id'
+
++        $topProductos = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'producto_id' por 'producto_id'
+
+             ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')
+
+             ->whereMonth('ventas.created_at', now()->month)
+
+             ->select('productos.descripcion', DB::raw('SUM(detalle_ventas.cantidad) as total_vendidos'))
+
+@@ -123,7 +123,7 @@
+             ->pluck('linea');
+
+ 
+
+         $productosSinVentas30d = Producto::whereNotIn('id', function ($query) {
+
+-            $query->select('producto_id')  // Cambié 'id_producto' por 'producto_id'
+
++            $query->select('producto_id')  // Cambié 'producto_id' por 'producto_id'
+
+                 ->from('detalle_ventas')
+
+                 ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')  // Cambié 'id_venta' por 'venta_id'
+
+                 ->where('ventas.created_at', '>=', now()->subDays(30));
+
+@@ -138,7 +138,7 @@
+             ->orderBy('descripcion')
+
+             ->get();
+
+ 
+
+-        $productosMayorRotacion = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'id_producto' por 'producto_id'
+
++        $productosMayorRotacion = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'producto_id' por 'producto_id'
+
+             ->select('productos.descripcion', DB::raw('SUM(cantidad) as total_vendidos'))
+
+             ->groupBy('productos.descripcion')
+
+             ->orderByDesc('total_vendidos')
+
+@@ -180,7 +180,7 @@
+         $lineaId = $request->input('linea_id');
+
+ 
+
+         $productos = Producto::whereNotIn('id', function ($query) {
+
+-            $query->select('producto_id')  // Cambié 'id_producto' por 'producto_id'
+
++            $query->select('producto_id')  // Cambié 'producto_id' por 'producto_id'
+
+                 ->from('detalle_ventas')
+
+                 ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')  // Cambié 'id_venta' por 'venta_id'
+
+                 ->where('ventas.created_at', '>=', now()->subDays(30));
+
+--- a/app/Http/Controllers/PanelDecisionesController.php
++++ b/app/Http/Controllers/PanelDecisionesController.php
+@@ -9,7 +9,7 @@
+ {
+
+     public function index(Request $request){
+
+         $stockTotalQuery = DB::table('inventarios')
+
+-           ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
+
++           ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
+
+            ->select('productos.descripcion', DB::raw('SUM(inventarios.cantidad) as stock_total'))
+
+            ->groupBy('productos.descripcion');
+
+ 
+
+@@ -25,7 +25,7 @@
+ 
+
+ 
+
+         $bajoStockQuery = DB::table('inventarios')
+
+-    ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
+
++    ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
+
+     ->select('productos.descripcion', DB::raw('SUM(inventarios.cantidad) as stock_total'))
+
+     ->groupBy('productos.descripcion')
+
+     ->having('stock_total', '<', 10);
+
+@@ -41,7 +41,7 @@
+ $bajoStock = $bajoStockQuery->get();
+
+ 
+
+         $agotadosQuery = DB::table('inventarios')
+
+-    ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
+
++    ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
+
+     ->select('productos.descripcion', DB::raw('SUM(inventarios.cantidad) as stock_total'))
+
+     ->groupBy('productos.descripcion')
+
+     ->having('stock_total', '=', 0);
+
+@@ -57,7 +57,7 @@
+ $agotados = $agotadosQuery->get();
+
+ 
+
+         $masVendidos = DB::table('detalle_ventas')
+
+-            ->join('productos', 'detalle_ventas.id_producto', '=', 'productos.id')
+
++            ->join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')
+
+             ->select('productos.descripcion', DB::raw('SUM(detalle_ventas.cantidad) as total_vendido'))
+
+             ->groupBy('productos.descripcion')
+
+             ->orderByDesc('total_vendido')
+
+@@ -66,15 +66,15 @@
+         $stockGeneral = DB::table('inventarios')->sum('cantidad');
+
+ 
+
+         $stockPorSucursal = DB::table('inventarios')
+
+-            ->join('sucursales', 'inventarios.id_sucursal', '=', 'sucursales.id')
+
++            ->join('sucursales', 'inventarios.sucursal_id', '=', 'sucursales.id')
+
+             ->select('sucursales.nombre as sucursal', DB::raw('SUM(inventarios.cantidad) as total_stock'))
+
+             ->groupBy('sucursales.nombre')
+
+             ->get();
+
+         $stockPorProductoSucursal = DB::table('inventarios')
+
+-            ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
+
+-            ->join('sucursales', 'inventarios.id_sucursal', '=', 'sucursales.id')
+
++            ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
+
++            ->join('sucursales', 'inventarios.sucursal_id', '=', 'sucursales.id')
+
+             ->select(
+
+-        'productos.id as id_producto',
+
++        'productos.id as producto_id',
+
+         'productos.descripcion',
+
+         'sucursales.nombre as sucursal',
+
+         'inventarios.cantidad'
+
+@@ -88,8 +88,8 @@
+ 
+
+ foreach ($productos as $producto) {
+
+     $stockSucursales = DB::table('inventarios')
+
+-        ->join('sucursales', 'inventarios.id_sucursal', '=', 'sucursales.id')
+
+-        ->where('inventarios.id_producto', $producto->id)
+
++        ->join('sucursales', 'inventarios.sucursal_id', '=', 'sucursales.id')
+
++        ->where('inventarios.producto_id', $producto->id)
+
+         ->select('sucursales.nombre as sucursal', 'inventarios.cantidad')
+
+         ->orderByDesc('inventarios.cantidad')
+
+         ->get();
+
+--- a/app/Http/Controllers/ProductoController.php
++++ b/app/Http/Controllers/ProductoController.php
+@@ -26,7 +26,7 @@
+     public function store(Request $request)
+
+     {
+
+         $request->validate([
+
+-            'codigo_item' => 'required|unique:productos',  // Cambié 'item_codigo' por 'codigo_item'
+
++            'codigo_item' => 'required|unique:productos',  // Cambié 'codigo_item' por 'codigo_item'
+
+             'descripcion' => 'required',
+
+         ]);
+
+ 
+
+@@ -46,7 +46,7 @@
+     public function update(Request $request, $id)
+
+     {
+
+         $request->validate([
+
+-            'codigo_item' => 'required|unique:productos,codigo_item,' . $id,  // Cambié 'item_codigo' por 'codigo_item'
+
++            'codigo_item' => 'required|unique:productos,codigo_item,' . $id,  // Cambié 'codigo_item' por 'codigo_item'
+
+             'descripcion' => 'required',
+
+         ]);
+
+ 
+
+@@ -75,7 +75,7 @@
+ 
+
+         // Aplicar filtros
+
+         if ($request->codigo) {
+
+-            $productos->where('codigo_item', 'like', '%' . $request->codigo . '%');  // Cambié 'item_codigo' por 'codigo_item'
+
++            $productos->where('codigo_item', 'like', '%' . $request->codigo . '%');  // Cambié 'codigo_item' por 'codigo_item'
+
+         }
+
+ 
+
+         if ($request->descripcion) {
+
+@@ -94,8 +94,8 @@
+             $stock_por_sucursal = [];
+
+ 
+
+             foreach ($sucursales as $sucursal) {
+
+-                $cantidad = Inventario::where('producto_id', $producto->id)  // Cambié 'id_producto' por 'producto_id'
+
+-                    ->where('sucursal_id', $sucursal->id)  // Cambié 'id_sucursal' por 'sucursal_id'
+
++                $cantidad = Inventario::where('producto_id', $producto->id)  // Cambié 'producto_id' por 'producto_id'
+
++                    ->where('sucursal_id', $sucursal->id)  // Cambié 'sucursal_id' por 'sucursal_id'
+
+                     ->value('cantidad') ?? 0;
+
+ 
+
+                 $stock_por_sucursal[$sucursal->id] = $cantidad;
+
+--- a/app/Models/DetalleEntrada.php
++++ b/app/Models/DetalleEntrada.php
+@@ -13,7 +13,7 @@
+ 
+
+     protected $fillable = [
+
+         'entrada_id',
+
+-        'producto_id',  // Cambié 'id_producto' por 'producto_id'
+
++        'producto_id',  // Cambié 'producto_id' por 'producto_id'
+
+         'cantidad',
+
+         'precio_unitario',
+
+     ];
+
+@@ -26,6 +26,6 @@
+ 
+
+     public function producto()
+
+     {
+
+-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ }
+
+--- a/app/Models/DetalleSalida.php
++++ b/app/Models/DetalleSalida.php
+@@ -13,7 +13,7 @@
+ 
+
+     protected $fillable = [
+
+         'salida_id',
+
+-        'producto_id',  // Cambié 'id_producto' por 'producto_id'
+
++        'producto_id',  // Cambié 'producto_id' por 'producto_id'
+
+         'cantidad',
+
+     ];
+
+ 
+
+@@ -24,6 +24,6 @@
+ 
+
+     public function producto()
+
+     {
+
+-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ }
+
+--- a/app/Models/DetalleTraspaso.php
++++ b/app/Models/DetalleTraspaso.php
+@@ -10,13 +10,13 @@
+ 
+
+     protected $fillable = [
+
+         'traspaso_id',
+
+-        'producto_id',  // Cambié 'id_producto' por 'producto_id'
+
++        'producto_id',  // Cambié 'producto_id' por 'producto_id'
+
+         'cantidad',
+
+     ];
+
+ 
+
+     public function producto()
+
+     {
+
+-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function traspaso()
+
+--- a/app/Models/DetalleVenta.php
++++ b/app/Models/DetalleVenta.php
+@@ -13,7 +13,7 @@
+ 
+
+     protected $fillable = [
+
+         'venta_id',  // Cambié 'id_venta' por 'venta_id'
+
+-        'producto_id',  // Cambié 'id_producto' por 'producto_id'
+
++        'producto_id',  // Cambié 'producto_id' por 'producto_id'
+
+         'cantidad',
+
+         'precio_unitario',
+
+         'descuento',
+
+@@ -27,7 +27,7 @@
+ 
+
+     public function producto()
+
+     {
+
+-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function detalles()
+
+--- a/app/Models/Entrada.php
++++ b/app/Models/Entrada.php
+@@ -9,7 +9,7 @@
+ {
+
+     use HasFactory;
+
+ 
+
+-    protected $fillable = ['sucursal_id', 'fecha', 'tipo', 'observacion'];  // Cambié 'id_sucursal' por 'sucursal_id'
+
++    protected $fillable = ['sucursal_id', 'fecha', 'tipo', 'observacion'];  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     
+
+     public function detalles()
+
+     {
+
+@@ -18,7 +18,7 @@
+ 
+
+     public function sucursal()
+
+     {
+
+-        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ 
+
+     public function traspaso()
+
+--- a/app/Models/Inventario.php
++++ b/app/Models/Inventario.php
+@@ -9,16 +9,16 @@
+ {
+
+     use HasFactory;
+
+ 
+
+-    protected $fillable = ['producto_id', 'sucursal_id', 'cantidad'];  // Cambié 'id_producto' por 'producto_id' y 'id_sucursal' por 'sucursal_id'
+
++    protected $fillable = ['producto_id', 'sucursal_id', 'cantidad'];  // Cambié 'producto_id' por 'producto_id' y 'sucursal_id' por 'sucursal_id'
+
+ 
+
+     public function producto()
+
+     {
+
+-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function sucursal()
+
+     {
+
+-        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ }
+
+ 
+
+--- a/app/Models/Producto.php
++++ b/app/Models/Producto.php
+@@ -17,32 +17,32 @@
+ 
+
+     public function inventarios()
+
+     {
+
+-        return $this->hasMany(Inventario::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->hasMany(Inventario::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function entradas()
+
+     {
+
+-        return $this->hasMany(Entrada::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->hasMany(Entrada::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function salidas()
+
+     {
+
+-        return $this->hasMany(Salida::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->hasMany(Salida::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function traspasos()
+
+     {
+
+-        return $this->hasMany(Traspaso::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->hasMany(Traspaso::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function detalleVentas()
+
+     {
+
+-        return $this->hasMany(DetalleVenta::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->hasMany(DetalleVenta::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function tomaInventarios()
+
+     {
+
+-        return $this->hasMany(TomaInventario::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->hasMany(TomaInventario::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ }
+
+ 
+
+--- a/app/Models/Salida.php
++++ b/app/Models/Salida.php
+@@ -9,11 +9,11 @@
+ {
+
+     use HasFactory;
+
+ 
+
+-    protected $fillable = ['sucursal_id', 'fecha', 'motivo', 'observacion', 'tipo'];  // Cambié 'id_sucursal' por 'sucursal_id'
+
++    protected $fillable = ['sucursal_id', 'fecha', 'motivo', 'observacion', 'tipo'];  // Cambié 'sucursal_id' por 'sucursal_id'
+
+ 
+
+     public function sucursal()
+
+     {
+
+-        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ 
+
+     public function detalles()
+
+--- a/app/Models/Sucursal.php
++++ b/app/Models/Sucursal.php
+@@ -15,17 +15,17 @@
+ 
+
+     public function inventarios()
+
+     {
+
+-        return $this->hasMany(Inventario::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->hasMany(Inventario::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ 
+
+     public function entradas()
+
+     {
+
+-        return $this->hasMany(Entrada::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->hasMany(Entrada::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ 
+
+     public function salidas()
+
+     {
+
+-        return $this->hasMany(Salida::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->hasMany(Salida::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ 
+
+     public function ventas()
+
+@@ -35,7 +35,7 @@
+ 
+
+     public function tomaInventarios()
+
+     {
+
+-        return $this->hasMany(TomaInventario::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->hasMany(TomaInventario::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ }
+
+ 
+
+--- a/app/Models/TomaInventario.php
++++ b/app/Models/TomaInventario.php
+@@ -12,8 +12,8 @@
+     protected $table = 'toma_inventarios';
+
+ 
+
+     protected $fillable = [
+
+-        'producto_id',  // Cambié 'id_producto' por 'producto_id'
+
+-        'sucursal_id',  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        'producto_id',  // Cambié 'producto_id' por 'producto_id'
+
++        'sucursal_id',  // Cambié 'sucursal_id' por 'sucursal_id'
+
+         'cantidad_contada',
+
+         'cantidad_sistema',
+
+         'diferencia',
+
+@@ -23,12 +23,12 @@
+ 
+
+     public function producto()
+
+     {
+
+-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+
++        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+
+     }
+
+ 
+
+     public function sucursal()
+
+     {
+
+-        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+
++        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
+
+     }
+
+ }
+
+ 
+
+--- a/resources/views/entradas/create.blade.php
++++ b/resources/views/entradas/create.blade.php
+@@ -28,8 +28,8 @@
+         <input type="date" name="fecha" class="form-control" value="{{ date('Y-m-d') }}" required>
+
+     </div>
+
+     <div class="col-md-4">
+
+-        <label for="id_sucursal">Sucursal destino</label>
+
+-        <select name="id_sucursal" class="form-control" required>
+
++        <label for="sucursal_id">Sucursal destino</label>
+
++        <select name="sucursal_id" class="form-control" required>
+
+             <option value="">-- Seleccionar --</option>
+
+             @foreach($sucursales as $sucursal)
+
+                 <option value="{{ $sucursal->id }}">{{ $sucursal->nombre }}</option>
+
+@@ -70,10 +70,10 @@
+             <tbody>
+
+                 <tr>
+
+                     <td>
+
+-                        <select name="productos[0][id_producto]" class="form-control" required>
+
++                        <select name="productos[0][producto_id]" class="form-control" required>
+
+                             <option value="">-- Seleccionar --</option>
+
+                             @foreach($productos as $producto)
+
+-                                <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+
++                                <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
+
+                             @endforeach
+
+                         </select>
+
+                     </td>
+
+@@ -116,10 +116,10 @@
+ 
+
+         nuevaFila.innerHTML = `
+
+             <td>
+
+-                <select name="productos[${filaIndex}][id_producto]" class="form-control" required>
+
++                <select name="productos[${filaIndex}][producto_id]" class="form-control" required>
+
+                     <option value="">-- Seleccionar --</option>
+
+                     @foreach($productos as $producto)
+
+-                        <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+
++                        <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
+
+                     @endforeach
+
+                 </select>
+
+             </td>
+
+--- a/resources/views/entradas/edit.blade.php
++++ b/resources/views/entradas/edit.blade.php
+@@ -25,11 +25,11 @@
+                 <input type="date" name="fecha" class="form-control" value="{{ $entrada->fecha }}" required>
+
+             </div>
+
+             <div class="col-md-4">
+
+-                <label for="id_sucursal">Sucursal destino</label>
+
+-                <select name="id_sucursal" class="form-control" required>
+
++                <label for="sucursal_id">Sucursal destino</label>
+
++                <select name="sucursal_id" class="form-control" required>
+
+                     <option value="">-- Seleccionar --</option>
+
+                     @foreach($sucursales as $sucursal)
+
+-                        <option value="{{ $sucursal->id }}" {{ $sucursal->id == $entrada->id_sucursal ? 'selected' : '' }}>
+
++                        <option value="{{ $sucursal->id }}" {{ $sucursal->id == $entrada->sucursal_id ? 'selected' : '' }}>
+
+                             {{ $sucursal->nombre }}
+
+                         </option>
+
+                     @endforeach
+
+@@ -66,11 +66,11 @@
+                 @foreach($entrada->detalles as $index => $detalle)
+
+                     <tr>
+
+                         <td>
+
+-                            <select name="productos[{{ $index }}][id_producto]" class="form-control" required>
+
++                            <select name="productos[{{ $index }}][producto_id]" class="form-control" required>
+
+                                 <option value="">-- Seleccionar --</option>
+
+                                 @foreach($productos as $producto)
+
+-                                    <option value="{{ $producto->id }}" {{ $producto->id == $detalle->id_producto ? 'selected' : '' }}>
+
+-                                        {{ $producto->item_codigo }} - {{ $producto->descripcion }}
+
++                                    <option value="{{ $producto->id }}" {{ $producto->id == $detalle->producto_id ? 'selected' : '' }}>
+
++                                        {{ $producto->codigo_item }} - {{ $producto->descripcion }}
+
+                                     </option>
+
+                                 @endforeach
+
+                             </select>
+
+@@ -115,10 +115,10 @@
+ 
+
+             nuevaFila.innerHTML = `
+
+                 <td>
+
+-                    <select name="productos[${filaIndex}][id_producto]" class="form-control" required>
+
++                    <select name="productos[${filaIndex}][producto_id]" class="form-control" required>
+
+                         <option value="">-- Seleccionar --</option>
+
+                         @foreach($productos as $producto)
+
+-                            <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+
++                            <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
+
+                         @endforeach
+
+                     </select>
+
+                 </td>
+
+--- a/resources/views/entradas/index.blade.php
++++ b/resources/views/entradas/index.blade.php
+@@ -62,7 +62,7 @@
+                     <tbody>
+
+                         @foreach($entrada->detalles as $detalle)
+
+                             <tr>
+
+-                                <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+
++                                <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
+
+                                 <td class="text-center fw-bold">{{ $detalle->cantidad }}</td>
+
+                                 <td class="text-center">{{ number_format($detalle->precio_unitario, 2) }}</td>
+
+                             </tr>
+
+--- a/resources/views/entradas/pdf.blade.php
++++ b/resources/views/entradas/pdf.blade.php
+@@ -85,7 +85,7 @@
+         <tbody>
+
+             @foreach($entrada->detalles as $detalle)
+
+                 <tr>
+
+-                    <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+
++                    <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
+
+                     <td>{{ $detalle->cantidad }}</td>
+
+                     <td>{{ number_format($detalle->precio_unitario, 2) }}</td>
+
+                 </tr>
+
+--- a/resources/views/productos/create.blade.php
++++ b/resources/views/productos/create.blade.php
+@@ -16,7 +16,7 @@
+         <div class="row">
+
+             @php
+
+                 $campos = [
+
+-                    'item_codigo' => 'Código',
+
++                    'codigo_item' => 'Código',
+
+                     'cod_barra' => 'Código de Barra',
+
+                     'descripcion' => 'Descripción',
+
+                     'linea' => 'Línea',
+
+--- a/resources/views/productos/edit.blade.php
++++ b/resources/views/productos/edit.blade.php
+@@ -17,7 +17,7 @@
+         <div class="row">
+
+             @php
+
+                 $campos = [
+
+-                    'item_codigo' => 'Código',
+
++                    'codigo_item' => 'Código',
+
+                     'cod_barra' => 'Código de Barra',
+
+                     'descripcion' => 'Descripción',
+
+                     'linea' => 'Línea',
+
+--- a/resources/views/productos/index.blade.php
++++ b/resources/views/productos/index.blade.php
+@@ -29,7 +29,7 @@
+     @foreach($productos as $p)
+
+         <tr>
+
+             <td>{{ $p->id }}</td>
+
+-            <td>{{ $p->item_codigo }}</td>
+
++            <td>{{ $p->codigo_item }}</td>
+
+             <td>{{ $p->descripcion }}</td>
+
+             <td>{{ $p->linea }}</td>
+
+             <td>{{ $p->talla }}</td>
+
+--- a/resources/views/productos/inventario.blade.php
++++ b/resources/views/productos/inventario.blade.php
+@@ -61,13 +61,13 @@
+                             $total = 0;
+
+                             $stock_por_sucursal = [];
+
+                             foreach($sucursales as $sucursal) {
+
+-                                $cantidad = $producto->inventarios->firstWhere('id_sucursal', $sucursal->id)->cantidad ?? 0;
+
++                                $cantidad = $producto->inventarios->firstWhere('sucursal_id', $sucursal->id)->cantidad ?? 0;
+
+                                 $total += $cantidad;
+
+                                 $stock_por_sucursal[] = $cantidad;
+
+                             }
+
+                         @endphp
+
+                         <tr>
+
+-                            <td>{{ $producto->item_codigo }}</td>
+
++                            <td>{{ $producto->codigo_item }}</td>
+
+                             <td>{{ $producto->descripcion }}</td>
+
+                             <td>{{ $producto->linea }}</td>
+
+                             <td>{{ $producto->familia }}</td>
+
+@@ -77,7 +77,7 @@
+                             {{-- Stock por sucursal --}}
+
+                             @foreach($sucursales as $sucursal)
+
+                                 @php
+
+-                                    $stock = $producto->inventarios->firstWhere('id_sucursal', $sucursal->id)->cantidad ?? 0;
+
++                                    $stock = $producto->inventarios->firstWhere('sucursal_id', $sucursal->id)->cantidad ?? 0;
+
+                                     $class = '';
+
+                                     if ($stock == 0) {
+
+                                         $class = 'text-danger fw-bold';
+
+--- a/resources/views/salidas/create.blade.php
++++ b/resources/views/salidas/create.blade.php
+@@ -34,8 +34,8 @@
+                 <input type="date" name="fecha" class="form-control" value="{{ date('Y-m-d') }}" required>
+
+             </div>
+
+             <div class="col-md-4">
+
+-                <label for="id_sucursal">Sucursal origen</label>
+
+-                <select name="id_sucursal" class="form-control" required>
+
++                <label for="sucursal_id">Sucursal origen</label>
+
++                <select name="sucursal_id" class="form-control" required>
+
+                     <option value="">-- Seleccionar --</option>
+
+                     @foreach($sucursales as $sucursal)
+
+                         <option value="{{ $sucursal->id }}">{{ $sucursal->nombre }}</option>
+
+@@ -79,10 +79,10 @@
+             <tbody>
+
+                 <tr>
+
+                     <td>
+
+-                        <select name="productos[0][id_producto]" class="form-control producto-select" required>
+
++                        <select name="productos[0][producto_id]" class="form-control producto-select" required>
+
+                             <option value="">-- Seleccionar --</option>
+
+                             @foreach($productos as $p)
+
+-                                <option value="{{ $p->id }}">{{ $p->item_codigo }} - {{ $p->descripcion }}</option>
+
++                                <option value="{{ $p->id }}">{{ $p->codigo_item }} - {{ $p->descripcion }}</option>
+
+                             @endforeach
+
+                         </select>
+
+                     </td>
+
+@@ -124,10 +124,10 @@
+ 
+
+             fila.innerHTML = `
+
+                 <td>
+
+-                    <select name="productos[${filaIndex}][id_producto]" class="form-control producto-select" required>
+
++                    <select name="productos[${filaIndex}][producto_id]" class="form-control producto-select" required>
+
+                         <option value="">-- Seleccionar --</option>
+
+                         @foreach($productos as $p)
+
+-                            <option value="{{ $p->id }}">{{ $p->item_codigo }} - {{ $p->descripcion }}</option>
+
++                            <option value="{{ $p->id }}">{{ $p->codigo_item }} - {{ $p->descripcion }}</option>
+
+                         @endforeach
+
+                     </select>
+
+                 </td>
+
+--- a/resources/views/salidas/edit.blade.php
++++ b/resources/views/salidas/edit.blade.php
+@@ -15,10 +15,10 @@
+                 <input type="date" name="fecha" class="form-control" value="{{ $salida->fecha }}" required>
+
+             </div>
+
+             <div class="col-md-4">
+
+-                <label for="id_sucursal">Sucursal</label>
+
+-                <select name="id_sucursal" class="form-control" required>
+
++                <label for="sucursal_id">Sucursal</label>
+
++                <select name="sucursal_id" class="form-control" required>
+
+                     @foreach($sucursales as $sucursal)
+
+-                        <option value="{{ $sucursal->id }}" {{ $salida->id_sucursal == $sucursal->id ? 'selected' : '' }}>
+
++                        <option value="{{ $sucursal->id }}" {{ $salida->sucursal_id == $sucursal->id ? 'selected' : '' }}>
+
+                             {{ $sucursal->nombre }}
+
+                         </option>
+
+                     @endforeach
+
+@@ -53,11 +53,11 @@
+                 @foreach($salida->detalles as $i => $detalle)
+
+                     <tr>
+
+                         <td>
+
+-                            <select name="productos[{{ $i }}][id_producto]" class="form-control select-producto" required>
+
++                            <select name="productos[{{ $i }}][producto_id]" class="form-control select-producto" required>
+
+                                 <option value="">-- Seleccionar --</option>
+
+                                 @foreach($productos as $producto)
+
+-                                    <option value="{{ $producto->id }}" {{ $detalle->id_producto == $producto->id ? 'selected' : '' }}>
+
+-                                        {{ $producto->item_codigo }} - {{ $producto->descripcion }}
+
++                                    <option value="{{ $producto->id }}" {{ $detalle->producto_id == $producto->id ? 'selected' : '' }}>
+
++                                        {{ $producto->codigo_item }} - {{ $producto->descripcion }}
+
+                                     </option>
+
+                                 @endforeach
+
+                             </select>
+
+@@ -96,10 +96,10 @@
+         const nuevaFila = document.createElement('tr');
+
+         nuevaFila.innerHTML = `
+
+             <td>
+
+-                <select name="productos[${filaIndex}][id_producto]" class="form-control select-producto" required>
+
++                <select name="productos[${filaIndex}][producto_id]" class="form-control select-producto" required>
+
+                     <option value="">-- Seleccionar --</option>
+
+                     @foreach($productos as $producto)
+
+-                        <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+
++                        <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
+
+                     @endforeach
+
+                 </select>
+
+             </td>
+
+--- a/resources/views/salidas/index.blade.php
++++ b/resources/views/salidas/index.blade.php
+@@ -65,7 +65,7 @@
+                     <tbody>
+
+                         @foreach($salida->detalles as $detalle)
+
+                             <tr>
+
+-                                <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+
++                                <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
+
+                                 <td class="text-center fw-bold">{{ $detalle->cantidad }}</td>
+
+                             </tr>
+
+                         @endforeach
+
+--- a/resources/views/salidas/pdf.blade.php
++++ b/resources/views/salidas/pdf.blade.php
+@@ -40,7 +40,7 @@
+         <tbody>
+
+             @foreach($salida->detalles as $detalle)
+
+                 <tr>
+
+-                    <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+
++                    <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
+
+                     <td>{{ $detalle->cantidad }}</td>
+
+                 </tr>
+
+             @endforeach
+
+--- a/resources/views/traspasos/create.blade.php
++++ b/resources/views/traspasos/create.blade.php
+@@ -136,7 +136,7 @@
+     const fila = `
+
+         <tr>
+
+             <td>
+
+-                <select name="productos[${index}][id_producto]" class="form-control select-producto" required></select>
+
++                <select name="productos[${index}][producto_id]" class="form-control select-producto" required></select>
+
+             </td>
+
+             <td class="text-center">
+
+                 <input type="text" class="form-control stock text-center" readonly>
+
+--- a/resources/views/traspasos/edit.blade.php
++++ b/resources/views/traspasos/edit.blade.php
+@@ -35,7 +35,7 @@
+                         <td>
+
+                             <select name="productos[]" class="form-control select-producto">
+
+                                 <option value="{{ $detalle->producto->id }}">
+
+-                                    {{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}
+
++                                    {{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}
+
+                                 </option>
+
+                             </select>
+
+                         </td>
+
+--- a/resources/views/traspasos/index.blade.php
++++ b/resources/views/traspasos/index.blade.php
+@@ -75,7 +75,7 @@
+                     <tbody>
+
+                         @foreach($t->detalles as $detalle)
+
+                             <tr>
+
+-                                <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+
++                                <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
+
+                                 <td class="text-center fw-bold">{{ $detalle->cantidad }}</td>
+
+                             </tr>
+
+                         @endforeach
+
+--- a/resources/views/traspasos/pdf.blade.php
++++ b/resources/views/traspasos/pdf.blade.php
+@@ -114,7 +114,7 @@
+             @php($totalItems += (int)$detalle->cantidad)
+
+             <tr>
+
+                 <td class="qty">{{ $i + 1 }}</td>
+
+-                <td class="code">{{ $detalle->producto->item_codigo }}</td>
+
++                <td class="code">{{ $detalle->producto->codigo_item }}</td>
+
+                 <td>{{ $detalle->producto->descripcion }}</td>
+
+                 <td class="qty"><strong>{{ $detalle->cantidad }}</strong></td>
+
+             </tr>
+
+--- a/resources/views/traspasos/revisar.blade.php
++++ b/resources/views/traspasos/revisar.blade.php
+@@ -78,7 +78,7 @@
+                     <tbody>
+
+                         @foreach ($traspaso->detalles as $detalle)
+
+                             <tr>
+
+-                                <td class="text-nowrap">{{ $detalle->producto->item_codigo }}</td>
+
++                                <td class="text-nowrap">{{ $detalle->producto->codigo_item }}</td>
+
+                                 <td>{{ $detalle->producto->descripcion }}</td>
+
+                                 <td class="text-center fw-semibold">{{ $detalle->cantidad }}</td>
+
+                             </tr>
+
+--- a/resources/views/traspasos/show.blade.php
++++ b/resources/views/traspasos/show.blade.php
+@@ -33,7 +33,7 @@
+         <tbody>
+
+             @foreach ($traspaso->detalles as $detalle)
+
+                 <tr>
+
+-                    <td>{{ $detalle->producto->item_codigo }}</td>
+
++                    <td>{{ $detalle->producto->codigo_item }}</td>
+
+                     <td>{{ $detalle->producto->descripcion }}</td>
+
+                     <td>{{ $detalle->cantidad }}</td>
+
+                 </tr>
+
+--- a/resources/views/ventas/create.blade.php
++++ b/resources/views/ventas/create.blade.php
+@@ -29,7 +29,7 @@
+         <!-- SUCURSAL -->
+
+         <div class="mb-3">
+
+             <label>Sucursal:</label>
+
+-            <select name="sucursal_id" id="id_sucursal" class="form-select compacto-input" required>
+
++            <select name="sucursal_id" id="sucursal_id" class="form-select compacto-input" required>
+
+                 @foreach($sucursales as $sucursal)
+
+                     <option value="{{ $sucursal->id }}">{{ $sucursal->nombre }}</option>
+
+                 @endforeach
+
+@@ -176,7 +176,7 @@
+         let selected = this.options[this.selectedIndex];
+
+         let precio = selected.getAttribute('data-precio');
+
+         let inventarios = JSON.parse(selected.getAttribute('data-inventarios') || '{}');
+
+-        let sucursalId = $('#id_sucursal').val();
+
++        let sucursalId = $('#sucursal_id').val();
+
+         let stock = inventarios[sucursalId] || 0;
+
+ 
+
+         let fila = $(this).closest('.producto-item');
