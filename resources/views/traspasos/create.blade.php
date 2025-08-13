@@ -136,7 +136,7 @@ function crearFilaProducto() {
     const fila = `
         <tr>
             <td>
-                <select name="productos[${index}][id_producto]" class="form-control select-producto" required></select>
+                <select name="productos[${index}][producto_id]" class="form-control select-producto" required></select>
             </td>
             <td class="text-center">
                 <input type="text" class="form-control stock text-center" readonly>

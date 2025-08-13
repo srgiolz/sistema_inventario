@@ -9,7 +9,7 @@ class PanelDecisionesController extends Controller
 {
     public function index(Request $request){
         $stockTotalQuery = DB::table('inventarios')
-           ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
+           ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
            ->select('productos.descripcion', DB::raw('SUM(inventarios.cantidad) as stock_total'))
            ->groupBy('productos.descripcion');
 
@@ -25,7 +25,7 @@ $stockTotal = $stockTotalQuery->get();
 
 
         $bajoStockQuery = DB::table('inventarios')
-    ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
+    ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
     ->select('productos.descripcion', DB::raw('SUM(inventarios.cantidad) as stock_total'))
     ->groupBy('productos.descripcion')
     ->having('stock_total', '<', 10);
@@ -41,7 +41,7 @@ if ($request->filled('producto')) {
 $bajoStock = $bajoStockQuery->get();
 
         $agotadosQuery = DB::table('inventarios')
-    ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
+    ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
     ->select('productos.descripcion', DB::raw('SUM(inventarios.cantidad) as stock_total'))
     ->groupBy('productos.descripcion')
     ->having('stock_total', '=', 0);
@@ -57,7 +57,7 @@ if ($request->filled('producto')) {
 $agotados = $agotadosQuery->get();
 
         $masVendidos = DB::table('detalle_ventas')
-            ->join('productos', 'detalle_ventas.id_producto', '=', 'productos.id')
+            ->join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')
             ->select('productos.descripcion', DB::raw('SUM(detalle_ventas.cantidad) as total_vendido'))
             ->groupBy('productos.descripcion')
             ->orderByDesc('total_vendido')
@@ -66,15 +66,15 @@ $agotados = $agotadosQuery->get();
         $stockGeneral = DB::table('inventarios')->sum('cantidad');
 
         $stockPorSucursal = DB::table('inventarios')
-            ->join('sucursales', 'inventarios.id_sucursal', '=', 'sucursales.id')
+            ->join('sucursales', 'inventarios.sucursal_id', '=', 'sucursales.id')
             ->select('sucursales.nombre as sucursal', DB::raw('SUM(inventarios.cantidad) as total_stock'))
             ->groupBy('sucursales.nombre')
             ->get();
         $stockPorProductoSucursal = DB::table('inventarios')
-            ->join('productos', 'inventarios.id_producto', '=', 'productos.id')
-            ->join('sucursales', 'inventarios.id_sucursal', '=', 'sucursales.id')
+            ->join('productos', 'inventarios.producto_id', '=', 'productos.id')
+            ->join('sucursales', 'inventarios.sucursal_id', '=', 'sucursales.id')
             ->select(
-        'productos.id as id_producto',
+        'productos.id as producto_id',
         'productos.descripcion',
         'sucursales.nombre as sucursal',
         'inventarios.cantidad'
@@ -88,8 +88,8 @@ $productos = DB::table('productos')->get();
 
 foreach ($productos as $producto) {
     $stockSucursales = DB::table('inventarios')
-        ->join('sucursales', 'inventarios.id_sucursal', '=', 'sucursales.id')
-        ->where('inventarios.id_producto', $producto->id)
+        ->join('sucursales', 'inventarios.sucursal_id', '=', 'sucursales.id')
+        ->where('inventarios.producto_id', $producto->id)
         ->select('sucursales.nombre as sucursal', 'inventarios.cantidad')
         ->orderByDesc('inventarios.cantidad')
         ->get();

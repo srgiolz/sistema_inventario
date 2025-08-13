@@ -9,7 +9,7 @@ class Entrada extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['sucursal_id', 'fecha', 'tipo', 'observacion'];  // Cambié 'id_sucursal' por 'sucursal_id'
+    protected $fillable = ['sucursal_id', 'fecha', 'tipo', 'observacion'];  // Cambié 'sucursal_id' por 'sucursal_id'
     
     public function detalles()
     {
@@ -18,7 +18,7 @@ class Entrada extends Model
 
     public function sucursal()
     {
-        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
     }
 
     public function traspaso()

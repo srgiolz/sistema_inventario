@@ -25,11 +25,11 @@
                 <input type="date" name="fecha" class="form-control" value="{{ $entrada->fecha }}" required>
             </div>
             <div class="col-md-4">
-                <label for="id_sucursal">Sucursal destino</label>
-                <select name="id_sucursal" class="form-control" required>
+                <label for="sucursal_id">Sucursal destino</label>
+                <select name="sucursal_id" class="form-control" required>
                     <option value="">-- Seleccionar --</option>
                     @foreach($sucursales as $sucursal)
-                        <option value="{{ $sucursal->id }}" {{ $sucursal->id == $entrada->id_sucursal ? 'selected' : '' }}>
+                        <option value="{{ $sucursal->id }}" {{ $sucursal->id == $entrada->sucursal_id ? 'selected' : '' }}>
                             {{ $sucursal->nombre }}
                         </option>
                     @endforeach
@@ -66,11 +66,11 @@
                 @foreach($entrada->detalles as $index => $detalle)
                     <tr>
                         <td>
-                            <select name="productos[{{ $index }}][id_producto]" class="form-control" required>
+                            <select name="productos[{{ $index }}][producto_id]" class="form-control" required>
                                 <option value="">-- Seleccionar --</option>
                                 @foreach($productos as $producto)
-                                    <option value="{{ $producto->id }}" {{ $producto->id == $detalle->id_producto ? 'selected' : '' }}>
-                                        {{ $producto->item_codigo }} - {{ $producto->descripcion }}
+                                    <option value="{{ $producto->id }}" {{ $producto->id == $detalle->producto_id ? 'selected' : '' }}>
+                                        {{ $producto->codigo_item }} - {{ $producto->descripcion }}
                                     </option>
                                 @endforeach
                             </select>
@@ -115,10 +115,10 @@
 
             nuevaFila.innerHTML = `
                 <td>
-                    <select name="productos[${filaIndex}][id_producto]" class="form-control" required>
+                    <select name="productos[${filaIndex}][producto_id]" class="form-control" required>
                         <option value="">-- Seleccionar --</option>
                         @foreach($productos as $producto)
-                            <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+                            <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
                         @endforeach
                     </select>
                 </td>

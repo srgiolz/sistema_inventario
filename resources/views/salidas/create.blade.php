@@ -34,8 +34,8 @@
                 <input type="date" name="fecha" class="form-control" value="{{ date('Y-m-d') }}" required>
             </div>
             <div class="col-md-4">
-                <label for="id_sucursal">Sucursal origen</label>
-                <select name="id_sucursal" class="form-control" required>
+                <label for="sucursal_id">Sucursal origen</label>
+                <select name="sucursal_id" class="form-control" required>
                     <option value="">-- Seleccionar --</option>
                     @foreach($sucursales as $sucursal)
                         <option value="{{ $sucursal->id }}">{{ $sucursal->nombre }}</option>
@@ -79,10 +79,10 @@
             <tbody>
                 <tr>
                     <td>
-                        <select name="productos[0][id_producto]" class="form-control producto-select" required>
+                        <select name="productos[0][producto_id]" class="form-control producto-select" required>
                             <option value="">-- Seleccionar --</option>
                             @foreach($productos as $p)
-                                <option value="{{ $p->id }}">{{ $p->item_codigo }} - {{ $p->descripcion }}</option>
+                                <option value="{{ $p->id }}">{{ $p->codigo_item }} - {{ $p->descripcion }}</option>
                             @endforeach
                         </select>
                     </td>
@@ -124,10 +124,10 @@
 
             fila.innerHTML = `
                 <td>
-                    <select name="productos[${filaIndex}][id_producto]" class="form-control producto-select" required>
+                    <select name="productos[${filaIndex}][producto_id]" class="form-control producto-select" required>
                         <option value="">-- Seleccionar --</option>
                         @foreach($productos as $p)
-                            <option value="{{ $p->id }}">{{ $p->item_codigo }} - {{ $p->descripcion }}</option>
+                            <option value="{{ $p->id }}">{{ $p->codigo_item }} - {{ $p->descripcion }}</option>
                         @endforeach
                     </select>
                 </td>

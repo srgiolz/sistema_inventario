@@ -12,8 +12,8 @@ class TomaInventario extends Model
     protected $table = 'toma_inventarios';
 
     protected $fillable = [
-        'producto_id',  // Cambié 'id_producto' por 'producto_id'
-        'sucursal_id',  // Cambié 'id_sucursal' por 'sucursal_id'
+        'producto_id',  // Cambié 'producto_id' por 'producto_id'
+        'sucursal_id',  // Cambié 'sucursal_id' por 'sucursal_id'
         'cantidad_contada',
         'cantidad_sistema',
         'diferencia',
@@ -23,12 +23,12 @@ class TomaInventario extends Model
 
     public function producto()
     {
-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 
     public function sucursal()
     {
-        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
     }
 }
 

@@ -29,7 +29,7 @@
     @foreach($productos as $p)
         <tr>
             <td>{{ $p->id }}</td>
-            <td>{{ $p->item_codigo }}</td>
+            <td>{{ $p->codigo_item }}</td>
             <td>{{ $p->descripcion }}</td>
             <td>{{ $p->linea }}</td>
             <td>{{ $p->talla }}</td>

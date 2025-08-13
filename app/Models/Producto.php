@@ -17,32 +17,32 @@ class Producto extends Model
 
     public function inventarios()
     {
-        return $this->hasMany(Inventario::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->hasMany(Inventario::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 
     public function entradas()
     {
-        return $this->hasMany(Entrada::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->hasMany(Entrada::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 
     public function salidas()
     {
-        return $this->hasMany(Salida::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->hasMany(Salida::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 
     public function traspasos()
     {
-        return $this->hasMany(Traspaso::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->hasMany(Traspaso::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 
     public function detalleVentas()
     {
-        return $this->hasMany(DetalleVenta::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->hasMany(DetalleVenta::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 
     public function tomaInventarios()
     {
-        return $this->hasMany(TomaInventario::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->hasMany(TomaInventario::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 }
 

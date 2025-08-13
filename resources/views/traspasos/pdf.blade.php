@@ -114,7 +114,7 @@
             @php($totalItems += (int)$detalle->cantidad)
             <tr>
                 <td class="qty">{{ $i + 1 }}</td>
-                <td class="code">{{ $detalle->producto->item_codigo }}</td>
+                <td class="code">{{ $detalle->producto->codigo_item }}</td>
                 <td>{{ $detalle->producto->descripcion }}</td>
                 <td class="qty"><strong>{{ $detalle->cantidad }}</strong></td>
             </tr>

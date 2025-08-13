@@ -26,7 +26,7 @@ class ProductoController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'codigo_item' => 'required|unique:productos',  // Cambié 'item_codigo' por 'codigo_item'
+            'codigo_item' => 'required|unique:productos',  // Cambié 'codigo_item' por 'codigo_item'
             'descripcion' => 'required',
         ]);
 
@@ -46,7 +46,7 @@ class ProductoController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate([
-            'codigo_item' => 'required|unique:productos,codigo_item,' . $id,  // Cambié 'item_codigo' por 'codigo_item'
+            'codigo_item' => 'required|unique:productos,codigo_item,' . $id,  // Cambié 'codigo_item' por 'codigo_item'
             'descripcion' => 'required',
         ]);
 
@@ -75,7 +75,7 @@ class ProductoController extends Controller
 
         // Aplicar filtros
         if ($request->codigo) {
-            $productos->where('codigo_item', 'like', '%' . $request->codigo . '%');  // Cambié 'item_codigo' por 'codigo_item'
+            $productos->where('codigo_item', 'like', '%' . $request->codigo . '%');  // Cambié 'codigo_item' por 'codigo_item'
         }
 
         if ($request->descripcion) {
@@ -94,8 +94,8 @@ class ProductoController extends Controller
             $stock_por_sucursal = [];
 
             foreach ($sucursales as $sucursal) {
-                $cantidad = Inventario::where('producto_id', $producto->id)  // Cambié 'id_producto' por 'producto_id'
-                    ->where('sucursal_id', $sucursal->id)  // Cambié 'id_sucursal' por 'sucursal_id'
+                $cantidad = Inventario::where('producto_id', $producto->id)  // Cambié 'producto_id' por 'producto_id'
+                    ->where('sucursal_id', $sucursal->id)  // Cambié 'sucursal_id' por 'sucursal_id'
                     ->value('cantidad') ?? 0;
 
                 $stock_por_sucursal[$sucursal->id] = $cantidad;

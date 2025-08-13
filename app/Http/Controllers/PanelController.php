@@ -104,7 +104,7 @@ class PanelController extends Controller
         $datos = $ventasPorMes->pluck('total');
 
         // 6️⃣ TOP PRODUCTOS MÁS VENDIDOS DEL MES
-        $topProductos = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'id_producto' por 'producto_id'
+        $topProductos = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'producto_id' por 'producto_id'
             ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')
             ->whereMonth('ventas.created_at', now()->month)
             ->select('productos.descripcion', DB::raw('SUM(detalle_ventas.cantidad) as total_vendidos'))
@@ -123,7 +123,7 @@ class PanelController extends Controller
             ->pluck('linea');
 
         $productosSinVentas30d = Producto::whereNotIn('id', function ($query) {
-            $query->select('producto_id')  // Cambié 'id_producto' por 'producto_id'
+            $query->select('producto_id')  // Cambié 'producto_id' por 'producto_id'
                 ->from('detalle_ventas')
                 ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')  // Cambié 'id_venta' por 'venta_id'
                 ->where('ventas.created_at', '>=', now()->subDays(30));
@@ -138,7 +138,7 @@ class PanelController extends Controller
             ->orderBy('descripcion')
             ->get();
 
-        $productosMayorRotacion = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'id_producto' por 'producto_id'
+        $productosMayorRotacion = DetalleVenta::join('productos', 'detalle_ventas.producto_id', '=', 'productos.id')  // Cambié 'producto_id' por 'producto_id'
             ->select('productos.descripcion', DB::raw('SUM(cantidad) as total_vendidos'))
             ->groupBy('productos.descripcion')
             ->orderByDesc('total_vendidos')
@@ -180,7 +180,7 @@ class PanelController extends Controller
         $lineaId = $request->input('linea_id');
 
         $productos = Producto::whereNotIn('id', function ($query) {
-            $query->select('producto_id')  // Cambié 'id_producto' por 'producto_id'
+            $query->select('producto_id')  // Cambié 'producto_id' por 'producto_id'
                 ->from('detalle_ventas')
                 ->join('ventas', 'detalle_ventas.venta_id', '=', 'ventas.id')  // Cambié 'id_venta' por 'venta_id'
                 ->where('ventas.created_at', '>=', now()->subDays(30));

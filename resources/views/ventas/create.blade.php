@@ -29,7 +29,7 @@
         <!-- SUCURSAL -->
         <div class="mb-3">
             <label>Sucursal:</label>
-            <select name="sucursal_id" id="id_sucursal" class="form-select compacto-input" required>
+            <select name="sucursal_id" id="sucursal_id" class="form-select compacto-input" required>
                 @foreach($sucursales as $sucursal)
                     <option value="{{ $sucursal->id }}">{{ $sucursal->nombre }}</option>
                 @endforeach
@@ -176,7 +176,7 @@ $(document).ready(function () {
         let selected = this.options[this.selectedIndex];
         let precio = selected.getAttribute('data-precio');
         let inventarios = JSON.parse(selected.getAttribute('data-inventarios') || '{}');
-        let sucursalId = $('#id_sucursal').val();
+        let sucursalId = $('#sucursal_id').val();
         let stock = inventarios[sucursalId] || 0;
 
         let fila = $(this).closest('.producto-item');

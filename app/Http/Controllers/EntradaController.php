@@ -38,11 +38,11 @@ class EntradaController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'sucursal_id' => 'required|exists:sucursales,id',  // Cambié 'id_sucursal' por 'sucursal_id'
+            'sucursal_id' => 'required|exists:sucursales,id',  // Cambié 'sucursal_id' por 'sucursal_id'
             'fecha' => 'required|date',
             'tipo' => 'required|string|max:100',
             'observacion' => 'nullable|string|max:255',
-            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'id_producto' por 'producto_id'
+            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'producto_id' por 'producto_id'
             'productos.*.cantidad' => 'required|integer|min:1',
             'productos.*.precio_unitario' => 'nullable|numeric|min:0',
         ]);
@@ -50,7 +50,7 @@ class EntradaController extends Controller
         DB::transaction(function () use ($request) {
             // Crear entrada general
             $entrada = Entrada::create([
-                'sucursal_id' => $request->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+                'sucursal_id' => $request->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
                 'fecha' => $request->fecha,
                 'tipo' => $request->tipo,
                 'observacion' => $request->observacion,
@@ -60,7 +60,7 @@ class EntradaController extends Controller
             foreach ($request->productos as $producto) {
                 DetalleEntrada::create([
                     'entrada_id' => $entrada->id,
-                    'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
+                    'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
                     'cantidad' => $producto['cantidad'],
                     'precio_unitario' => $producto['precio_unitario'] ?? null,
                 ]);
@@ -68,8 +68,8 @@ class EntradaController extends Controller
                 // Actualizar inventario
                 $inventario = Inventario::firstOrCreate(
                     [
-                        'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
-                        'sucursal_id' => $request->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+                        'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+                        'sucursal_id' => $request->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
                     ],
                     ['cantidad' => 0]
                 );
@@ -90,10 +90,10 @@ class EntradaController extends Controller
         // VALIDACIÓN GLOBAL POR PRODUCTO
         foreach ($entradaOriginal->detalles as $detalle) {
             // 1. Verificar si existe otra entrada posterior del mismo producto
-            $hayOtraEntradaPosterior = Entrada::where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+            $hayOtraEntradaPosterior = Entrada::where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
                 ->where('fecha', '>', $entradaOriginal->fecha)
                 ->whereHas('detalles', function ($q) use ($detalle) {
-                    $q->where('producto_id', $detalle->producto_id);  // Cambié 'id_producto' por 'producto_id'
+                    $q->where('producto_id', $detalle->producto_id);  // Cambié 'producto_id' por 'producto_id'
                 })
                 ->exists();
 
@@ -102,8 +102,8 @@ class EntradaController extends Controller
             }
 
             // 2. Verificar si el stock actual alcanza para reversar
-            $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'id_producto' por 'producto_id'
-                ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+            $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
+                ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
                 ->first();
 
             if (!$inventario || $inventario->cantidad < $detalle->cantidad) {
@@ -114,7 +114,7 @@ class EntradaController extends Controller
         // 🛠 Proceso de reversa si pasa la validación
         DB::transaction(function () use ($entradaOriginal) {
             $entradaReversa = Entrada::create([
-                'sucursal_id' => $entradaOriginal->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+                'sucursal_id' => $entradaOriginal->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
                 'fecha' => now()->format('Y-m-d'),
                 'tipo' => $entradaOriginal->tipo,
                 'observacion' => 'Reversión de entrada #' . $entradaOriginal->id,
@@ -123,13 +123,13 @@ class EntradaController extends Controller
             foreach ($entradaOriginal->detalles as $detalle) {
                 DetalleEntrada::create([
                     'entrada_id' => $entradaReversa->id,
-                    'producto_id' => $detalle->producto_id,  // Cambié 'id_producto' por 'producto_id'
+                    'producto_id' => $detalle->producto_id,  // Cambié 'producto_id' por 'producto_id'
                     'cantidad' => -1 * $detalle->cantidad,
                     'precio_unitario' => $detalle->precio_unitario,
                 ]);
 
-                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'id_producto' por 'producto_id'
-                    ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
+                    ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
                     ->first();
 
                 if ($inventario) {
@@ -172,13 +172,13 @@ class EntradaController extends Controller
             'tipo' => 'required|string|max:100',
             'observacion' => 'nullable|string|max:255',
             'productos' => 'required|array|min:1',
-            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'id_producto' por 'producto_id'
+            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'producto_id' por 'producto_id'
             'productos.*.cantidad' => 'required|numeric|min:1',
             'productos.*.precio_unitario' => 'nullable|numeric|min:0',
         ]);
 
         // Validar productos duplicados
-        $productosIds = collect($request->productos)->pluck('producto_id');  // Cambié 'id_producto' por 'producto_id'
+        $productosIds = collect($request->productos)->pluck('producto_id');  // Cambié 'producto_id' por 'producto_id'
         if ($productosIds->duplicates()->isNotEmpty()) {
             return back()->withErrors(['productos' => 'No se permiten productos duplicados.'])->withInput();
         }
@@ -193,8 +193,8 @@ class EntradaController extends Controller
 
             // Revertir stock de los detalles anteriores (si manejas stock dinámico)
             foreach ($entrada->detalles as $detalle) {
-                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'id_producto' por 'producto_id'
-                    ->where('sucursal_id', $entrada->sucursal_id)  // Cambié 'id_sucursal' por 'sucursal_id'
+                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
+                    ->where('sucursal_id', $entrada->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
                     ->first();
 
                 if ($inventario) {
@@ -208,7 +208,7 @@ class EntradaController extends Controller
             // Registrar los nuevos productos y ajustar inventario
             foreach ($request->productos as $producto) {
                 $detalle = $entrada->detalles()->create([
-                    'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
+                    'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
                     'cantidad' => $producto['cantidad'],
                     'precio_unitario' => $producto['precio_unitario'] ?? 0,
                 ]);
@@ -216,8 +216,8 @@ class EntradaController extends Controller
                 // Aumentar stock
                 $inventario = Inventario::firstOrCreate(
                     [
-                        'producto_id' => $producto['producto_id'],  // Cambié 'id_producto' por 'producto_id'
-                        'sucursal_id' => $entrada->sucursal_id,  // Cambié 'id_sucursal' por 'sucursal_id'
+                        'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+                        'sucursal_id' => $entrada->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
                     ],
                     ['cantidad' => 0]
                 );

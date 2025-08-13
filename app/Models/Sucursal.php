@@ -15,17 +15,17 @@ class Sucursal extends Model
 
     public function inventarios()
     {
-        return $this->hasMany(Inventario::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+        return $this->hasMany(Inventario::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
     }
 
     public function entradas()
     {
-        return $this->hasMany(Entrada::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+        return $this->hasMany(Entrada::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
     }
 
     public function salidas()
     {
-        return $this->hasMany(Salida::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+        return $this->hasMany(Salida::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
     }
 
     public function ventas()
@@ -35,7 +35,7 @@ class Sucursal extends Model
 
     public function tomaInventarios()
     {
-        return $this->hasMany(TomaInventario::class, 'sucursal_id');  // Cambié 'id_sucursal' por 'sucursal_id'
+        return $this->hasMany(TomaInventario::class, 'sucursal_id');  // Cambié 'sucursal_id' por 'sucursal_id'
     }
 }
 

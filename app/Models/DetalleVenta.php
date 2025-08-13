@@ -13,7 +13,7 @@ class DetalleVenta extends Model
 
     protected $fillable = [
         'venta_id',  // Cambié 'id_venta' por 'venta_id'
-        'producto_id',  // Cambié 'id_producto' por 'producto_id'
+        'producto_id',  // Cambié 'producto_id' por 'producto_id'
         'cantidad',
         'precio_unitario',
         'descuento',
@@ -27,7 +27,7 @@ class DetalleVenta extends Model
 
     public function producto()
     {
-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'id_producto' por 'producto_id'
+        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
     }
 
     public function detalles()

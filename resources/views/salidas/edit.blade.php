@@ -15,10 +15,10 @@
                 <input type="date" name="fecha" class="form-control" value="{{ $salida->fecha }}" required>
             </div>
             <div class="col-md-4">
-                <label for="id_sucursal">Sucursal</label>
-                <select name="id_sucursal" class="form-control" required>
+                <label for="sucursal_id">Sucursal</label>
+                <select name="sucursal_id" class="form-control" required>
                     @foreach($sucursales as $sucursal)
-                        <option value="{{ $sucursal->id }}" {{ $salida->id_sucursal == $sucursal->id ? 'selected' : '' }}>
+                        <option value="{{ $sucursal->id }}" {{ $salida->sucursal_id == $sucursal->id ? 'selected' : '' }}>
                             {{ $sucursal->nombre }}
                         </option>
                     @endforeach
@@ -53,11 +53,11 @@
                 @foreach($salida->detalles as $i => $detalle)
                     <tr>
                         <td>
-                            <select name="productos[{{ $i }}][id_producto]" class="form-control select-producto" required>
+                            <select name="productos[{{ $i }}][producto_id]" class="form-control select-producto" required>
                                 <option value="">-- Seleccionar --</option>
                                 @foreach($productos as $producto)
-                                    <option value="{{ $producto->id }}" {{ $detalle->id_producto == $producto->id ? 'selected' : '' }}>
-                                        {{ $producto->item_codigo }} - {{ $producto->descripcion }}
+                                    <option value="{{ $producto->id }}" {{ $detalle->producto_id == $producto->id ? 'selected' : '' }}>
+                                        {{ $producto->codigo_item }} - {{ $producto->descripcion }}
                                     </option>
                                 @endforeach
                             </select>
@@ -96,10 +96,10 @@
         const nuevaFila = document.createElement('tr');
         nuevaFila.innerHTML = `
             <td>
-                <select name="productos[${filaIndex}][id_producto]" class="form-control select-producto" required>
+                <select name="productos[${filaIndex}][producto_id]" class="form-control select-producto" required>
                     <option value="">-- Seleccionar --</option>
                     @foreach($productos as $producto)
-                        <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+                        <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
                     @endforeach
                 </select>
             </td>

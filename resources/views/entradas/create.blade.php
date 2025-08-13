@@ -28,8 +28,8 @@
         <input type="date" name="fecha" class="form-control" value="{{ date('Y-m-d') }}" required>
     </div>
     <div class="col-md-4">
-        <label for="id_sucursal">Sucursal destino</label>
-        <select name="id_sucursal" class="form-control" required>
+        <label for="sucursal_id">Sucursal destino</label>
+        <select name="sucursal_id" class="form-control" required>
             <option value="">-- Seleccionar --</option>
             @foreach($sucursales as $sucursal)
                 <option value="{{ $sucursal->id }}">{{ $sucursal->nombre }}</option>
@@ -70,10 +70,10 @@
             <tbody>
                 <tr>
                     <td>
-                        <select name="productos[0][id_producto]" class="form-control" required>
+                        <select name="productos[0][producto_id]" class="form-control" required>
                             <option value="">-- Seleccionar --</option>
                             @foreach($productos as $producto)
-                                <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+                                <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
                             @endforeach
                         </select>
                     </td>
@@ -116,10 +116,10 @@
 
         nuevaFila.innerHTML = `
             <td>
-                <select name="productos[${filaIndex}][id_producto]" class="form-control" required>
+                <select name="productos[${filaIndex}][producto_id]" class="form-control" required>
                     <option value="">-- Seleccionar --</option>
                     @foreach($productos as $producto)
-                        <option value="{{ $producto->id }}">{{ $producto->item_codigo }} - {{ $producto->descripcion }}</option>
+                        <option value="{{ $producto->id }}">{{ $producto->codigo_item }} - {{ $producto->descripcion }}</option>
                     @endforeach
                 </select>
             </td>

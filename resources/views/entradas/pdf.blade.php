@@ -85,7 +85,7 @@
         <tbody>
             @foreach($entrada->detalles as $detalle)
                 <tr>
-                    <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+                    <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
                     <td>{{ $detalle->cantidad }}</td>
                     <td>{{ number_format($detalle->precio_unitario, 2) }}</td>
                 </tr>

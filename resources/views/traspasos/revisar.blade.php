@@ -78,7 +78,7 @@
                     <tbody>
                         @foreach ($traspaso->detalles as $detalle)
                             <tr>
-                                <td class="text-nowrap">{{ $detalle->producto->item_codigo }}</td>
+                                <td class="text-nowrap">{{ $detalle->producto->codigo_item }}</td>
                                 <td>{{ $detalle->producto->descripcion }}</td>
                                 <td class="text-center fw-semibold">{{ $detalle->cantidad }}</td>
                             </tr>

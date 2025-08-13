@@ -33,7 +33,7 @@
         <tbody>
             @foreach ($traspaso->detalles as $detalle)
                 <tr>
-                    <td>{{ $detalle->producto->item_codigo }}</td>
+                    <td>{{ $detalle->producto->codigo_item }}</td>
                     <td>{{ $detalle->producto->descripcion }}</td>
                     <td>{{ $detalle->cantidad }}</td>
                 </tr>

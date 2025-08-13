@@ -40,7 +40,7 @@
         <tbody>
             @foreach($salida->detalles as $detalle)
                 <tr>
-                    <td>{{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}</td>
+                    <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
                     <td>{{ $detalle->cantidad }}</td>
                 </tr>
             @endforeach

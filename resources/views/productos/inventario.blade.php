@@ -61,13 +61,13 @@
                             $total = 0;
                             $stock_por_sucursal = [];
                             foreach($sucursales as $sucursal) {
-                                $cantidad = $producto->inventarios->firstWhere('id_sucursal', $sucursal->id)->cantidad ?? 0;
+                                $cantidad = $producto->inventarios->firstWhere('sucursal_id', $sucursal->id)->cantidad ?? 0;
                                 $total += $cantidad;
                                 $stock_por_sucursal[] = $cantidad;
                             }
                         @endphp
                         <tr>
-                            <td>{{ $producto->item_codigo }}</td>
+                            <td>{{ $producto->codigo_item }}</td>
                             <td>{{ $producto->descripcion }}</td>
                             <td>{{ $producto->linea }}</td>
                             <td>{{ $producto->familia }}</td>
@@ -77,7 +77,7 @@
                             {{-- Stock por sucursal --}}
                             @foreach($sucursales as $sucursal)
                                 @php
-                                    $stock = $producto->inventarios->firstWhere('id_sucursal', $sucursal->id)->cantidad ?? 0;
+                                    $stock = $producto->inventarios->firstWhere('sucursal_id', $sucursal->id)->cantidad ?? 0;
                                     $class = '';
                                     if ($stock == 0) {
                                         $class = 'text-danger fw-bold';

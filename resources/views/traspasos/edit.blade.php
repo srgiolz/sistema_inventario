@@ -35,7 +35,7 @@
                         <td>
                             <select name="productos[]" class="form-control select-producto">
                                 <option value="{{ $detalle->producto->id }}">
-                                    {{ $detalle->producto->item_codigo }} - {{ $detalle->producto->descripcion }}
+                                    {{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}
                                 </option>
                             </select>
                         </td>

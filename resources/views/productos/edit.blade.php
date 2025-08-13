@@ -17,7 +17,7 @@
         <div class="row">
             @php
                 $campos = [
-                    'item_codigo' => 'Código',
+                    'codigo_item' => 'Código',
                     'cod_barra' => 'Código de Barra',
                     'descripcion' => 'Descripción',
                     'linea' => 'Línea',
