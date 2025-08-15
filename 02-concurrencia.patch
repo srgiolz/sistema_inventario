@@ -1,0 +1,150 @@
+diff --git a/app/Http/Controllers/TraspasoController.php b/app/Http/Controllers/TraspasoController.php
+--- a/app/Http/Controllers/TraspasoController.php
++++ b/app/Http/Controllers/TraspasoController.php
+@@ -50,7 +50,7 @@
+                 ->withInput();
+         }
+ 
+-        DB::beginTransaction();
++        return DB::transaction(function() use ($request) {
+         try {
+             $tipo = ($request->de_sucursal == 99) ? 'abastecimiento' : 'sucursal';
+ 
+@@ -70,6 +70,7 @@
+ 
+                 $origen = Inventario::where('producto_id', $productoId)
+                     ->where('sucursal_id', $request->de_sucursal)
++                    ->lockForUpdate()
+                     ->first();
+ 
+                 if (!$origen || $origen->cantidad < $cantidad) {
+@@ -88,10 +89,10 @@
+                 ]);
+             }
+ 
+-            DB::commit();
+-            return redirect()->route('traspasos.index')->with('success', '✅ Traspaso registrado correctamente.');
++                        return redirect()->route('traspasos.index')->with('success', '✅ Traspaso registrado correctamente.');
++        });
+         } catch (\Exception $e) {
+-            DB::rollBack();
++                        throw $e;
+             return back()->withErrors(['error' => $e->getMessage()])->withInput();
+         }
+     }
+@@ -134,15 +135,20 @@
+             return back()->with('error', 'Este traspaso ya fue confirmado o rechazado.');
+         }
+ 
++        return DB::transaction(function() use ($traspaso) {
+         // Sumar al inventario de la sucursal destino
+         foreach ($traspaso->detalles as $detalle) {
+-            $inventario = Inventario::firstOrCreate(
+-                [
++            $inventario = $inventario = Inventario::where('producto_id', $detalle->producto_id)
++                ->where('sucursal_id', $traspaso->sucursal_destino_id)
++                ->lockForUpdate()
++                ->first();
++            if (!$inventario) {
++                $inventario = Inventario::create([
+                     'producto_id' => $detalle->producto_id,
+-                    'sucursal_id' => $traspaso->sucursal_destino_id
+-                ],
+-                ['cantidad' => 0]
+-            );
++                    'sucursal_id' => $traspaso->sucursal_destino_id,
++                    'cantidad' => 0
++                ]);
++            }
+ 
+             $inventario->cantidad += $detalle->cantidad;
+             $inventario->save();
+@@ -154,7 +160,8 @@
+         $traspaso->usuario_confirma_id = auth()->check() ? auth()->id() : null;
+         $traspaso->save();
+ 
+-        return redirect()->route('traspasos.index')->with('success', '✅ Traspaso confirmado y stock actualizado.');
++                return redirect()->route('traspasos.index')->with('success', '✅ Traspaso confirmado y stock actualizado.');
++        });
+     }
+ 
+     public function rechazar(Traspaso $traspaso)
+@@ -163,15 +170,20 @@
+             return back()->with('error', 'Este traspaso ya fue confirmado o rechazado.');
+         }
+ 
++        return DB::transaction(function() use ($traspaso) {
+         // Devolver stock al origen
+         foreach ($traspaso->detalles as $detalle) {
+-            $inventario = Inventario::firstOrCreate(
+-                [
++            $inventario = $inventario = Inventario::where('producto_id', $detalle->producto_id)
++                ->where('sucursal_id', $traspaso->sucursal_origen_id)
++                ->lockForUpdate()
++                ->first();
++            if (!$inventario) {
++                $inventario = Inventario::create([
+                     'producto_id' => $detalle->producto_id,
+-                    'sucursal_id' => $traspaso->sucursal_origen_id
+-                ],
+-                ['cantidad' => 0]
+-            );
++                    'sucursal_id' => $traspaso->sucursal_origen_id,
++                    'cantidad' => 0
++                ]);
++            }
+ 
+             $inventario->cantidad += $detalle->cantidad;
+             $inventario->save();
+@@ -182,7 +194,8 @@
+         $traspaso->usuario_confirma_id = auth()->check() ? auth()->id() : null;
+         $traspaso->save();
+ 
+-        return redirect()->route('traspasos.index')->with('error', '❌ Traspaso rechazado y stock devuelto al origen.');
++                return redirect()->route('traspasos.index')->with('error', '❌ Traspaso rechazado y stock devuelto al origen.');
++        });
+     }
+ 
+     public function edit($id)
+@@ -204,12 +217,13 @@
+             return redirect()->route('traspasos.show', $id)->with('error', 'Este traspaso ya fue confirmado o rechazado.');
+         }
+ 
+-        DB::beginTransaction();
++        return DB::transaction(function() use ($request) {
+         try {
+             // 1) Revertir stock anterior en el origen
+             foreach ($traspaso->detalles as $detalle) {
+                 $inventario = Inventario::where('producto_id', $detalle->producto_id)
+                     ->where('sucursal_id', $traspaso->sucursal_origen_id)
++                    ->lockForUpdate()
+                     ->first();
+ 
+                 if ($inventario) {
+@@ -230,10 +244,11 @@
+ 
+                 $inventario = Inventario::where('producto_id', $producto_id)
+                     ->where('sucursal_id', $traspaso->sucursal_origen_id)
++                    ->lockForUpdate()
+                     ->first();
+ 
+                 if (!$inventario || $inventario->cantidad < $cantidad) {
+-                    DB::rollBack();
++                                throw $e;
+                     return back()->with('error', "❌ Stock insuficiente para el producto ID {$producto_id}.");
+                 }
+ 
+@@ -255,10 +270,10 @@
+                 $traspaso->save();
+             }
+ 
+-            DB::commit();
+-            return redirect()->route('traspasos.show', $traspaso->id)->with('success', '✅ Traspaso editado correctamente.');
++                        return redirect()->route('traspasos.show', $traspaso->id)->with('success', '✅ Traspaso editado correctamente.');
++        });
+         } catch (\Exception $e) {
+-            DB::rollBack();
++                        throw $e;
+             return back()->with('error', 'Ocurrió un error: ' . $e->getMessage());
+         }
+     }

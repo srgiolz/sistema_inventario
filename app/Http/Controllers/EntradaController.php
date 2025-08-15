@@ -6,10 +6,10 @@ use App\Models\Entrada;
 use App\Models\DetalleEntrada;
 use App\Models\Producto;
 use App\Models\Sucursal;
-use App\Models\Inventario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\InventarioService;
 
 class EntradaController extends Controller
 {
@@ -17,12 +17,9 @@ class EntradaController extends Controller
     {
         $entradas = Entrada::with(['sucursal', 'detalles.producto'])->latest()->get();
 
-        // Obtener IDs de entradas que ya fueron reversadas
         $idsReversadas = Entrada::where('observacion', 'like', 'Reversión de entrada #%')
             ->pluck('observacion')
-            ->map(function ($obs) {
-                return (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT);
-            })
+            ->map(fn($obs) => (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT))
             ->toArray();
 
         return view('entradas.index', compact('entradas', 'idsReversadas'));
@@ -38,44 +35,41 @@ class EntradaController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'sucursal_id' => 'required|exists:sucursales,id',  // Cambié 'sucursal_id' por 'sucursal_id'
+            'sucursal_id' => 'required|exists:sucursales,id',
             'fecha' => 'required|date',
             'tipo' => 'required|string|max:100',
             'observacion' => 'nullable|string|max:255',
-            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'producto_id' por 'producto_id'
+            'productos.*.producto_id' => 'required|exists:productos,id',
             'productos.*.cantidad' => 'required|integer|min:1',
             'productos.*.precio_unitario' => 'nullable|numeric|min:0',
         ]);
 
         DB::transaction(function () use ($request) {
-            // Crear entrada general
             $entrada = Entrada::create([
-                'sucursal_id' => $request->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
+                'sucursal_id' => $request->sucursal_id,
                 'fecha' => $request->fecha,
                 'tipo' => $request->tipo,
                 'observacion' => $request->observacion,
             ]);
 
-            // Registrar productos asociados
             foreach ($request->productos as $producto) {
                 DetalleEntrada::create([
                     'entrada_id' => $entrada->id,
-                    'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+                    'producto_id' => $producto['producto_id'],
                     'cantidad' => $producto['cantidad'],
                     'precio_unitario' => $producto['precio_unitario'] ?? null,
                 ]);
 
-                // Actualizar inventario
-                $inventario = Inventario::firstOrCreate(
-                    [
-                        'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
-                        'sucursal_id' => $request->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
-                    ],
-                    ['cantidad' => 0]
+                // Usar el servicio para mover stock y registrar Kardex
+                InventarioService::entradaNormal(
+                    $request->sucursal_id,
+                    $producto['producto_id'],
+                    $producto['cantidad'],
+                    $producto['precio_unitario'] ?? 0,
+                    'Entrada',
+                    $entrada->id,
+                    auth()->id()
                 );
-
-                $inventario->cantidad += $producto['cantidad'];
-                $inventario->save();
             }
         });
 
@@ -84,37 +78,23 @@ class EntradaController extends Controller
 
     public function reversar($id)
     {
-        // Obtener la entrada con sus detalles y productos relacionados
         $entradaOriginal = Entrada::with('detalles.producto')->findOrFail($id);
 
-        // VALIDACIÓN GLOBAL POR PRODUCTO
+        // Validar que haya stock suficiente para revertir
         foreach ($entradaOriginal->detalles as $detalle) {
-            // 1. Verificar si existe otra entrada posterior del mismo producto
-            $hayOtraEntradaPosterior = Entrada::where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
-                ->where('fecha', '>', $entradaOriginal->fecha)
-                ->whereHas('detalles', function ($q) use ($detalle) {
-                    $q->where('producto_id', $detalle->producto_id);  // Cambié 'producto_id' por 'producto_id'
-                })
-                ->exists();
+            $stockActual = \App\Models\Inventario::where('producto_id', $detalle->producto_id)
+                ->where('sucursal_id', $entradaOriginal->sucursal_id)
+                ->value('cantidad') ?? 0;
 
-            if ($hayOtraEntradaPosterior) {
-                return redirect()->route('entradas.index')->with('error', 'No se puede reversar esta entrada porque el producto "' . $detalle->producto->descripcion . '" tiene otra entrada posterior.');
-            }
-
-            // 2. Verificar si el stock actual alcanza para reversar
-            $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
-                ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
-                ->first();
-
-            if (!$inventario || $inventario->cantidad < $detalle->cantidad) {
-                return redirect()->route('entradas.index')->with('error', 'No se puede reversar esta entrada porque el stock actual del producto "' . $detalle->producto->descripcion . '" no es suficiente.');
+            if ($stockActual < $detalle->cantidad) {
+                return redirect()->route('entradas.index')
+                    ->with('error', 'No se puede reversar: stock insuficiente del producto "' . $detalle->producto->descripcion . '"');
             }
         }
 
-        // 🛠 Proceso de reversa si pasa la validación
         DB::transaction(function () use ($entradaOriginal) {
             $entradaReversa = Entrada::create([
-                'sucursal_id' => $entradaOriginal->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
+                'sucursal_id' => $entradaOriginal->sucursal_id,
                 'fecha' => now()->format('Y-m-d'),
                 'tipo' => $entradaOriginal->tipo,
                 'observacion' => 'Reversión de entrada #' . $entradaOriginal->id,
@@ -123,19 +103,22 @@ class EntradaController extends Controller
             foreach ($entradaOriginal->detalles as $detalle) {
                 DetalleEntrada::create([
                     'entrada_id' => $entradaReversa->id,
-                    'producto_id' => $detalle->producto_id,  // Cambié 'producto_id' por 'producto_id'
-                    'cantidad' => -1 * $detalle->cantidad,
+                    'producto_id' => $detalle->producto_id,
+                    'cantidad' => -$detalle->cantidad,
                     'precio_unitario' => $detalle->precio_unitario,
                 ]);
 
-                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
-                    ->where('sucursal_id', $entradaOriginal->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
-                    ->first();
-
-                if ($inventario) {
-                    $inventario->cantidad -= $detalle->cantidad;
-                    $inventario->save();
-                }
+                // Usar el servicio para restar stock
+                InventarioService::salidaNormal(
+    $entradaOriginal->sucursal_id,
+    $detalle->producto_id,
+    $detalle->cantidad,
+    $detalle->precio_unitario ?? 0,
+    'Reversión Entrada',
+    $entradaReversa->id,
+    auth()->id(),
+    'Reversión de entrada #' . $entradaOriginal->id
+);
             }
         });
 
@@ -146,7 +129,6 @@ class EntradaController extends Controller
     {
         $entrada = Entrada::with('detalles')->findOrFail($id);
 
-        // Validar que la entrada sea del mismo día
         if (!\Carbon\Carbon::parse($entrada->fecha)->isToday()) {
             return redirect()->route('entradas.index')->with('error', 'Solo puedes editar entradas del mismo día.');
         }
@@ -161,69 +143,63 @@ class EntradaController extends Controller
     {
         $entrada = Entrada::findOrFail($id);
 
-        // Validar que solo se permita editar si es del mismo día
         if (!\Carbon\Carbon::parse($entrada->fecha)->isToday()) {
             return redirect()->route('entradas.index')->with('error', 'Solo se pueden editar entradas del mismo día.');
         }
 
-        // Validaciones de los campos
         $request->validate([
             'fecha' => 'required|date',
             'tipo' => 'required|string|max:100',
             'observacion' => 'nullable|string|max:255',
             'productos' => 'required|array|min:1',
-            'productos.*.producto_id' => 'required|exists:productos,id',  // Cambié 'producto_id' por 'producto_id'
+            'productos.*.producto_id' => 'required|exists:productos,id',
             'productos.*.cantidad' => 'required|numeric|min:1',
             'productos.*.precio_unitario' => 'nullable|numeric|min:0',
         ]);
 
-        // Validar productos duplicados
-        $productosIds = collect($request->productos)->pluck('producto_id');  // Cambié 'producto_id' por 'producto_id'
+        $productosIds = collect($request->productos)->pluck('producto_id');
         if ($productosIds->duplicates()->isNotEmpty()) {
             return back()->withErrors(['productos' => 'No se permiten productos duplicados.'])->withInput();
         }
 
         DB::transaction(function () use ($request, $entrada) {
-            // Actualizar cabecera
             $entrada->update([
                 'fecha' => $request->fecha,
                 'tipo' => $request->tipo,
                 'observacion' => $request->observacion,
             ]);
 
-            // Revertir stock de los detalles anteriores (si manejas stock dinámico)
+            // Eliminar detalles antiguos y ajustar inventario (reversa de lo anterior)
             foreach ($entrada->detalles as $detalle) {
-                $inventario = Inventario::where('producto_id', $detalle->producto_id)  // Cambié 'producto_id' por 'producto_id'
-                    ->where('sucursal_id', $entrada->sucursal_id)  // Cambié 'sucursal_id' por 'sucursal_id'
-                    ->first();
-
-                if ($inventario) {
-                    $inventario->cantidad -= $detalle->cantidad;
-                    $inventario->save();
-                }
-
+                InventarioService::salidaNormal(
+                    $entrada->sucursal_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    $detalle->precio_unitario ?? 0,
+                    'Edición Entrada',
+                    $entrada->id,
+                    auth()->id()
+                );
                 $detalle->delete();
             }
 
-            // Registrar los nuevos productos y ajustar inventario
+            // Insertar nuevos detalles y sumar al inventario
             foreach ($request->productos as $producto) {
-                $detalle = $entrada->detalles()->create([
-                    'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
+                $entrada->detalles()->create([
+                    'producto_id' => $producto['producto_id'],
                     'cantidad' => $producto['cantidad'],
                     'precio_unitario' => $producto['precio_unitario'] ?? 0,
                 ]);
 
-                // Aumentar stock
-                $inventario = Inventario::firstOrCreate(
-                    [
-                        'producto_id' => $producto['producto_id'],  // Cambié 'producto_id' por 'producto_id'
-                        'sucursal_id' => $entrada->sucursal_id,  // Cambié 'sucursal_id' por 'sucursal_id'
-                    ],
-                    ['cantidad' => 0]
+                InventarioService::entradaNormal(
+                    $entrada->sucursal_id,
+                    $producto['producto_id'],
+                    $producto['cantidad'],
+                    $producto['precio_unitario'] ?? 0,
+                    'Edición Entrada',
+                    $entrada->id,
+                    auth()->id()
                 );
-
-                $inventario->cantidad += $producto['cantidad'];
-                $inventario->save();
             }
         });
 
@@ -233,13 +209,9 @@ class EntradaController extends Controller
     public function generarPdf($id)
     {
         $entrada = Entrada::with(['sucursal', 'detalles.producto'])->findOrFail($id);
-
-        $pdf = Pdf::loadView('entradas.pdf', compact('entrada'))
-            ->setPaper('A4', 'portrait');
-
-        return $pdf->stream('Entrada_'.$entrada->id.'.pdf');
+        $pdf = Pdf::loadView('entradas.pdf', compact('entrada'))->setPaper('A4', 'portrait');
+        return $pdf->stream('Entrada_' . $entrada->id . '.pdf');
     }
 }
-
 
 

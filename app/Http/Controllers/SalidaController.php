@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Salida;
 use App\Models\Producto;
 use App\Models\Sucursal;
-use App\Models\Inventario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\DetalleSalida;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\InventarioService;
 
 class SalidaController extends Controller
 {
@@ -33,10 +33,7 @@ class SalidaController extends Controller
             'productos.*.cantidad' => 'required|integer|min:1',
         ]);
 
-        try {
-            DB::beginTransaction();
-
-            // 1) Cabecera
+        DB::transaction(function () use ($request) {
             $salida = Salida::create([
                 'fecha' => $request->fecha,
                 'sucursal_id' => $request->sucursal_id,
@@ -45,53 +42,35 @@ class SalidaController extends Controller
                 'observacion' => $request->observacion,
             ]);
 
-            // 2) Detalle + stock
             foreach ($request->productos as $item) {
-                $productoId = $item['producto_id'];
-                $cantidad = $item['cantidad'];
-
-                $inventario = Inventario::where('producto_id', $productoId)
-                    ->where('sucursal_id', $request->sucursal_id)
-                    ->first();
-
-                if (!$inventario || $inventario->cantidad < $cantidad) {
-                    DB::rollBack();
-                    return redirect()->back()
-                        ->withErrors(['stock' => "Stock insuficiente para el producto ID: $productoId"])
-                        ->withInput();
-                }
-
                 DetalleSalida::create([
                     'salida_id' => $salida->id,
-                    'producto_id' => $productoId,
-                    'cantidad' => $cantidad,
+                    'producto_id' => $item['producto_id'],
+                    'cantidad' => $item['cantidad'],
                 ]);
 
-                $inventario->cantidad -= $cantidad;
-                $inventario->save();
+                // Usar el servicio para restar stock y registrar en Kardex
+                InventarioService::salidaNormal(
+                    $request->sucursal_id,
+                    $item['producto_id'],
+                    $item['cantidad'],
+                    0, // Precio no relevante en salida
+                    'Salida',
+                    $salida->id,
+                    auth()->id()
+                );
             }
+        });
 
-            DB::commit();
-
-            return redirect()->route('salidas.index')->with('success', 'Salida registrada exitosamente.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()
-                ->withErrors(['error' => 'Error al registrar la salida: ' . $e->getMessage()])
-                ->withInput();
-        }
+        return redirect()->route('salidas.index')->with('success', 'Salida registrada exitosamente.');
     }
 
     public function index()
     {
         $salidas = Salida::with('detalles.producto', 'sucursal')->latest()->get();
-
-        // IDs de salidas ya reversadas (por observacion)
         $idsReversadas = Salida::where('observacion', 'like', 'Reversión de salida #%')
             ->pluck('observacion')
-            ->map(function ($obs) {
-                return (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT);
-            })
+            ->map(fn($obs) => (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT))
             ->toArray();
 
         return view('salidas.index', compact('salidas', 'idsReversadas'));
@@ -133,13 +112,15 @@ class SalidaController extends Controller
         DB::transaction(function () use ($request, $salida) {
             // Revertir stock anterior
             foreach ($salida->detalles as $detalle) {
-                $inventario = Inventario::where('producto_id', $detalle->producto_id)
-                    ->where('sucursal_id', $salida->sucursal_id)
-                    ->first();
-                if ($inventario) {
-                    $inventario->cantidad += $detalle->cantidad;
-                    $inventario->save();
-                }
+                InventarioService::entradaNormal(
+                    $salida->sucursal_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'Edición Salida',
+                    $salida->id,
+                    auth()->id()
+                );
                 $detalle->delete();
             }
 
@@ -152,24 +133,23 @@ class SalidaController extends Controller
                 'observacion' => $request->observacion,
             ]);
 
-            // Nuevos detalles + descuento stock
+            // Nuevos detalles y descuento de stock
             foreach ($request->productos as $item) {
-                $inventario = Inventario::where('producto_id', $item['producto_id'])
-                    ->where('sucursal_id', $request->sucursal_id)
-                    ->first();
-
-                if (!$inventario || $inventario->cantidad < $item['cantidad']) {
-                    throw new \Exception("Stock insuficiente para el producto ID: {$item['producto_id']}");
-                }
-
                 DetalleSalida::create([
                     'salida_id' => $salida->id,
                     'producto_id' => $item['producto_id'],
                     'cantidad' => $item['cantidad'],
                 ]);
 
-                $inventario->cantidad -= $item['cantidad'];
-                $inventario->save();
+                InventarioService::salidaNormal(
+                    $request->sucursal_id,
+                    $item['producto_id'],
+                    $item['cantidad'],
+                    0,
+                    'Edición Salida',
+                    $salida->id,
+                    auth()->id()
+                );
             }
         });
 
@@ -179,18 +159,14 @@ class SalidaController extends Controller
     public function generarPdf($id)
     {
         $salida = Salida::with(['sucursal', 'detalles.producto'])->findOrFail($id);
-
-        $pdf = Pdf::loadView('salidas.pdf', compact('salida'))
-            ->setPaper('A4', 'portrait');
-
-        return $pdf->stream('Salida_'.$salida->id.'.pdf');
+        $pdf = Pdf::loadView('salidas.pdf', compact('salida'))->setPaper('A4', 'portrait');
+        return $pdf->stream('Salida_' . $salida->id . '.pdf');
     }
 
     public function reversar($id)
     {
         $salidaOriginal = Salida::with('detalles.producto')->findOrFail($id);
 
-        // Ya existe reversa (por observación)
         $existeReversa = Salida::where('observacion', 'like', 'Reversión de salida #%')
             ->where('observacion', 'like', '%'.$salidaOriginal->id.'%')
             ->exists();
@@ -198,13 +174,11 @@ class SalidaController extends Controller
             return redirect()->route('salidas.index')->with('error', 'Esta salida ya fue reversada.');
         }
 
-        // Límite 7 días
         $diasTranscurridos = \Carbon\Carbon::parse($salidaOriginal->fecha)->diffInDays(now());
         if ($diasTranscurridos > 7) {
             return redirect()->route('salidas.index')->with('error', 'Solo puedes reversar salidas dentro de los 7 días posteriores a su registro.');
         }
 
-        // Proceso de reversa
         DB::transaction(function () use ($salidaOriginal) {
             $salidaReversa = Salida::create([
                 'fecha' => now()->format('Y-m-d'),
@@ -221,16 +195,15 @@ class SalidaController extends Controller
                     'cantidad' => $detalle->cantidad
                 ]);
 
-                $inventario = Inventario::firstOrCreate(
-                    [
-                        'producto_id' => $detalle->producto_id,
-                        'sucursal_id' => $salidaOriginal->sucursal_id
-                    ],
-                    ['cantidad' => 0]
+                InventarioService::entradaNormal(
+                    $salidaOriginal->sucursal_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'Reversión Salida',
+                    $salidaReversa->id,
+                    auth()->id()
                 );
-
-                $inventario->cantidad += $detalle->cantidad;
-                $inventario->save();
             }
         });
 

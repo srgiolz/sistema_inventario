@@ -1,0 +1,82 @@
+diff --git a/resources/views/layouts/app.blade.php b/resources/views/layouts/app.blade.php
+--- a/resources/views/layouts/app.blade.php
++++ b/resources/views/layouts/app.blade.php
+@@ -174,7 +174,33 @@
+ 
+     <!-- Contenido -->
+     <div class="flex-grow-1 p-4">
+-        @yield('content')
++        <div class="container mt-3">
++    @if (session('success'))
++        <div class="alert alert-success alert-dismissible fade show" role="alert">
++            {!! session('success') !!}
++            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
++        </div>
++    @endif
++    @if (session('error'))
++        <div class="alert alert-danger alert-dismissible fade show" role="alert">
++            {!! session('error') !!}
++            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
++        </div>
++    @endif
++    @if ($errors->any())
++        <div class="alert alert-warning alert-dismissible fade show" role="alert">
++            <strong>Revisa los campos:</strong>
++            <ul class="mb-0">
++                @foreach ($errors->all() as $msg)
++                    <li>{{ $msg }}</li>
++                @endforeach
++            </ul>
++            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
++        </div>
++    @endif
++</div>
++
++    @yield('content')
+     </div>
+ </div>
+ 
+diff --git a/resources/views/traspasos/edit.blade.php b/resources/views/traspasos/edit.blade.php
+--- a/resources/views/traspasos/edit.blade.php
++++ b/resources/views/traspasos/edit.blade.php
+@@ -155,3 +155,18 @@
+ </script>
+ @endpush
+ 
++
++
++@push('scripts')
++<script>
++// Evita doble envío de formularios en esta página
++document.addEventListener('DOMContentLoaded', function(){
++    const form = document.querySelector('form');
++    if (!form) return;
++    form.addEventListener('submit', function(){
++        const btn = form.querySelector('[type="submit"]');
++        if (btn) { btn.setAttribute('disabled','disabled'); btn.innerText = 'Guardando...'; }
++    });
++});
++</script>
++@endpush
+diff --git a/resources/views/traspasos/create.blade.php b/resources/views/traspasos/create.blade.php
+--- a/resources/views/traspasos/create.blade.php
++++ b/resources/views/traspasos/create.blade.php
+@@ -201,3 +201,18 @@
+ @endpush
+ @endsection
+ 
++
++
++@push('scripts')
++<script>
++// Evita doble envío de formularios en esta página
++document.addEventListener('DOMContentLoaded', function(){
++    const form = document.querySelector('form');
++    if (!form) return;
++    form.addEventListener('submit', function(){
++        const btn = form.querySelector('[type="submit"]');
++        if (btn) { btn.setAttribute('disabled','disabled'); btn.innerText = 'Guardando...'; }
++    });
++});
++</script>
++@endpush

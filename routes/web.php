@@ -9,6 +9,8 @@ use App\Http\Controllers\SalidaController;
 use App\Http\Controllers\TraspasoController;
 use App\Http\Controllers\PanelDecisionesController;
 use App\Http\Controllers\PanelController;
+use App\Http\Controllers\KardexController;
+
 
 // Rutas protegidas por auth
 Route::middleware(['auth'])->group(function () {
@@ -64,6 +66,9 @@ Route::middleware(['auth'])->group(function () {
 
     // 🧾 Ticket venta
     Route::get('/ventas/{venta}/ticket', [VentaController::class, 'generarTicket'])->name('ventas.ticket');
+
+    // 📒 Kardex
+    Route::get('/kardex', [KardexController::class, 'index'])->name('kardex.index');
 
     // 📈 Stock individual (para JS)
     Route::get('/stock/{id_producto}/{id_sucursal}', [TraspasoController::class, 'obtenerStock']);

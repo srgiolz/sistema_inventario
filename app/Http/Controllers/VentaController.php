@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Venta;
 use App\Models\DetalleVenta;
-use App\Models\Inventario;
 use App\Models\Producto;
 use App\Models\Cliente;
 use App\Models\Sucursal;
@@ -12,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use App\Services\InventarioService;
 
 class VentaController extends Controller
 {
@@ -45,7 +45,7 @@ class VentaController extends Controller
             $venta = Venta::create([
                 'cliente_id'      => $request->cliente_id,
                 'sucursal_id'     => $request->sucursal_id,
-                'fecha'           => today()->toDateString(), // Solo fecha (YYYY-MM-DD)
+                'fecha'           => today()->toDateString(),
                 'tipo_pago_id'    => $request->tipo_pago_id,
                 'descuento_total' => $request->descuento_total ?? 0,
                 'con_factura'     => (bool) ($request->con_factura ?? false),
@@ -70,17 +70,16 @@ class VentaController extends Controller
                     'subtotal'       => $subtotal
                 ]);
 
-                $inventario = Inventario::where('producto_id', $p['producto_id'])
-                    ->where('sucursal_id', $request->sucursal_id)
-                    ->lockForUpdate() // Evita que otra transacción modifique al mismo tiempo
-                    ->first();
-
-                if ($inventario && $inventario->cantidad >= $cantidad) {
-                    $inventario->cantidad -= $cantidad;
-                    $inventario->save();
-                } else {
-                    throw new \Exception("No hay suficiente stock para el producto ID {$p['producto_id']}");
-                }
+                // Registrar en Kardex como Salida (Venta)
+                InventarioService::salidaNormal(
+                    $request->sucursal_id,
+                    $p['producto_id'],
+                    $cantidad,
+                    $precio,
+                    'Venta', // documento_tipo
+                    $venta->id,
+                    auth()->id()
+                );
             }
 
             $venta->update([
@@ -97,7 +96,7 @@ class VentaController extends Controller
 
     public function index()
     {
-        $ventas = Venta::with(['cliente', 'sucursal', 'tipoPago']) // Incluye tipoPago
+        $ventas = Venta::with(['cliente', 'sucursal', 'tipoPago'])
             ->orderByDesc('id')
             ->get();
         return view('ventas.index', compact('ventas'));
@@ -105,7 +104,7 @@ class VentaController extends Controller
 
     public function show($id)
     {
-        $venta = Venta::with(['cliente', 'sucursal', 'tipoPago', 'detalles.producto']) // Incluye tipoPago
+        $venta = Venta::with(['cliente', 'sucursal', 'tipoPago', 'detalles.producto'])
             ->findOrFail($id);
         return view('ventas.show', compact('venta'));
     }
@@ -119,5 +118,28 @@ class VentaController extends Controller
         $pdf = Pdf::loadView('ventas.ticket', compact('venta'));
         return $pdf->stream("ticket_venta_{$venta->id}.pdf");
     }
-}
 
+    /**
+     * Anular una venta y devolver el stock
+     */
+    public function anular($id)
+    {
+        $venta = Venta::with('detalles')->findOrFail($id);
+
+        DB::transaction(function () use ($venta) {
+            foreach ($venta->detalles as $detalle) {
+                InventarioService::entradaNormal(
+                    $venta->sucursal_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    $detalle->precio_unitario,
+                    'Anulación Venta', // documento_tipo
+                    $venta->id,
+                    auth()->id()
+                );
+            }
+        });
+
+        return redirect()->route('ventas.index')->with('success', 'Venta anulada y stock devuelto.');
+    }
+}

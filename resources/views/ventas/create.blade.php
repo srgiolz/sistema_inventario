@@ -3,13 +3,6 @@
 @section('content')
 <div class="container">
     <h2>Registrar Venta</h2>
-
-    @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-    @elseif(session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
-    @endif
-
     <form method="POST" action="{{ route('ventas.store') }}">
         @csrf
 
