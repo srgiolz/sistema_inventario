@@ -14,18 +14,6 @@
         </a>
     </div>
 
-    {{-- Alerts --}}
-    @if (session('error'))
-        <div class="alert alert-danger shadow-sm">{{ session('error') }}</div>
-    @endif
-    @if ($errors->any())
-        <div class="alert alert-danger shadow-sm">
-            <ul class="mb-0">
-                @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-            </ul>
-        </div>
-    @endif
-
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body">
 
@@ -99,9 +87,9 @@
                 {{-- Barra de acciones --}}
                 <div class="d-flex justify-content-end gap-2 mt-3">
                     <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary">Cancelar</a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check2-circle me-1"></i> Registrar traspaso
-                    </button>
+                    <button type="button" id="btnRegistrar" class="btn btn-primary">
+    <i class="bi bi-check2-circle me-1"></i> Registrar traspaso
+</button>
                 </div>
             </form>
         </div>
@@ -125,6 +113,8 @@
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 
 <script>
 let index = 0;
@@ -185,19 +175,60 @@ function actualizarStock(selectElement) {
 $(function () {
     $('#agregar-producto').on('click', crearFilaProducto);
     $('#tabla-productos').on('click', '.eliminar', function () { $(this).closest('tr').remove(); });
-    $('#tabla-productos').on('change', '.select-producto', function () { actualizarStock($(this)); });
+
+    // ✅ Evitar productos duplicados en la tabla
+    $('#tabla-productos').on('change', '.select-producto', function () {
+        const seleccionado = $(this).val();
+        let repetido = false;
+
+        $('.select-producto').not(this).each(function () {
+            if ($(this).val() === seleccionado) {
+                repetido = true;
+            }
+        });
+
+        if (repetido) {
+            alert('⚠️ Ese producto ya fue agregado. Elige otro.');
+            $(this).val(null).trigger('change'); // limpia el select
+        } else {
+            actualizarStock($(this)); // si no es repetido, actualiza stock
+        }
+    });
 
     $('form').on('submit', function (e) {
         let ok = true;
         $('#tabla-productos tbody tr').each(function () {
             const stock = parseInt($(this).find('.stock').val()) || 0;
             const cantidad = parseInt($(this).find('.cantidad').val()) || 0;
-            if (cantidad > stock) { alert('No puedes traspasar más de lo disponible.'); ok = false; return false; }
+            if (cantidad > stock) {
+                alert('No puedes traspasar más de lo disponible.');
+                ok = false;
+                return false;
+            }
         });
         if (!ok) e.preventDefault();
     });
 });
+$('#btnRegistrar').on('click', function (e) {
+    e.preventDefault();
+
+    Swal.fire({
+        title: '¿Registrar traspaso?',
+        text: 'Verifica que los productos y cantidades sean correctos.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, registrar',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $('form').submit(); // ✅ envía el formulario solo si confirma
+        }
+    });
+});
+
 </script>
+
 @endpush
 @endsection
 

@@ -80,16 +80,17 @@
             <input type="text" id="total" name="total" class="form-control" readonly>
         </div>
 
-        <!-- TIPO DE PAGO -->
-        <div class="mb-3">
-            <label>Tipo de pago:</label>
-            <select name="tipo_pago_id" class="form-select" required>
-                <option value="">-- Selecciona --</option>
-                <option value="1">Efectivo</option>
-                <option value="2">QR</option>
-                <option value="3">Tarjeta</option>
-            </select>
-        </div>
+       <!-- TIPO DE PAGO -->
+<div class="mb-3">
+    <label>Tipo de pago:</label>
+    <select name="tipo_pago_id" class="form-select" required>
+        <option value="">-- Selecciona --</option>
+        @foreach($tiposPago as $tipo)
+            <option value="{{ $tipo->id }}">{{ ucfirst($tipo->nombre) }}</option>
+        @endforeach
+    </select>
+</div>
+
 
         <!-- CON FACTURA -->
         <div class="mb-3">

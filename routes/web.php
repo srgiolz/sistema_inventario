@@ -27,6 +27,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('productos', ProductoController::class);
     Route::resource('clientes', ClienteController::class);
     Route::resource('ventas', VentaController::class);
+    Route::patch('/ventas/{id}/anular', [VentaController::class, 'anular'])->name('ventas.anular');
+
     //Inventario/Entradas
     Route::resource('entradas', EntradaController::class);
     Route::post('/entradas/{id}/reversar', [EntradaController::class, 'reversar'])->name('entradas.reversar');
@@ -51,6 +53,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/traspasos/{traspaso}/revisar', [TraspasoController::class, 'revisar'])->name('traspasos.revisar');
     Route::patch('/traspasos/{traspaso}/confirmar', [TraspasoController::class, 'confirmar'])->name('traspasos.confirmar');
     Route::patch('/traspasos/{traspaso}/rechazar', [TraspasoController::class, 'rechazar'])->name('traspasos.rechazar');
+    Route::get('/traspasos/pendientes', [TraspasoController::class, 'pendientes'])->name('traspasos.pendientes');
 
     // 🔄 Editar traspasos
     Route::get('/traspasos/{id}/editar', [TraspasoController::class, 'edit'])->name('traspasos.edit');

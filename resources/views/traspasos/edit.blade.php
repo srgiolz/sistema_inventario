@@ -14,6 +14,10 @@
             <strong>Fecha:</strong> {{ \Carbon\Carbon::parse($traspaso->fecha)->format('d/m/Y') }}<br>
         </div>
 
+        {{-- 👇 Inputs ocultos para que pasen la validación --}}
+        <input type="hidden" name="de_sucursal" value="{{ $traspaso->sucursal_origen_id }}">
+        <input type="hidden" name="a_sucursal" value="{{ $traspaso->sucursal_destino_id }}">
+
         <div class="mb-3">
             <label for="observacion" class="form-label">Observación</label>
             <textarea name="observacion" id="observacion" class="form-control">{{ old('observacion', $traspaso->observacion) }}</textarea>
@@ -52,7 +56,7 @@
                             <button type="button" class="btn btn-danger btn-sm eliminar-fila">🗑️</button>
                         </td>
 
-                        {{-- Cantidad original de ESTE traspaso para este producto (stock editable) --}}
+                        {{-- Cantidad original de ESTE traspaso para este producto --}}
                         <input type="hidden" class="cantidad-original" value="{{ $detalle->cantidad }}">
                     </tr>
                 @endforeach
@@ -71,7 +75,6 @@
 @push('scripts')
 <script>
 $(document).ready(function () {
-    // Campo correcto: sucursal ORIGEN
     const sucursalId = {{ $traspaso->sucursal_origen_id }};
 
     function initSelect2($select) {
@@ -89,7 +92,6 @@ $(document).ready(function () {
         });
     }
 
-    // Cargar stock "editable" = stock real + cantidad original del detalle
     function cargarStockEditable($row) {
         const $stockTd = $row.find('.stock-disponible');
         const productoId = $row.find('.select-producto').val();
@@ -99,32 +101,26 @@ $(document).ready(function () {
 
         $.get(`/stock/${productoId}/${sucursalId}`, function (data) {
             const base = (data && data.stock !== undefined) ? parseInt(data.stock, 10) : 0;
-            $stockTd.text(base + original); // stock editable
+            $stockTd.text(base + original);
         }).fail(function () {
-            $stockTd.text(original);        // al menos refleja lo original
+            $stockTd.text(original);
         });
     }
 
-    // Inicializar filas existentes
     $('.select-producto').each(function () {
         const $select = $(this);
         initSelect2($select);
         cargarStockEditable($select.closest('tr'));
     });
 
-    // Si cambian el producto en una fila ya existente:
-    // - el "original" ya no aplica → set 0
-    // - recargar stock para ese nuevo producto
     $('#tablaProductos').on('change', '.select-producto', function () {
         const $row = $(this).closest('tr');
         $row.find('.cantidad-original').val(0);
         cargarStockEditable($row);
     });
 
-    // Índice para nuevas filas
     let idx = $('#tablaProductos tbody tr').length;
 
-    // Agregar nueva fila
     $('#agregarProducto').on('click', function () {
         const nuevaFila = `
             <tr>
@@ -149,12 +145,10 @@ $(document).ready(function () {
         idx++;
     });
 
-    // Eliminar fila
     $('#tablaProductos').on('click', '.eliminar-fila', function () {
         $(this).closest('tr').remove();
     });
 
-    // Validación antes de enviar
     $('#formEditarTraspaso').on('submit', function (e) {
         let ok = true;
 

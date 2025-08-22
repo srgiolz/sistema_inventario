@@ -7,6 +7,7 @@ use App\Models\DetalleVenta;
 use App\Models\Producto;
 use App\Models\Cliente;
 use App\Models\Sucursal;
+use App\Models\TipoPago;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -20,7 +21,8 @@ class VentaController extends Controller
         return view('ventas.create', [
             'clientes'   => Cliente::all(),
             'productos'  => Producto::with('inventarios')->get(),
-            'sucursales' => Sucursal::all()
+            'sucursales' => Sucursal::all(),
+            'tiposPago'  => TipoPago::where('activo', 1)->get(), // ahora dinámico
         ]);
     }
 
@@ -34,7 +36,7 @@ class VentaController extends Controller
             'productos.*.cantidad'       => 'required|numeric|min:1',
             'productos.*.precio'         => 'required|numeric|min:0',
             'productos.*.descuento'      => 'nullable|numeric|min:0',
-            'tipo_pago_id'               => 'nullable|exists:tipos_pago,id',
+            'tipo_pago_id'               => 'required|exists:tipos_pago,id', // obligatorio
             'descuento_total'            => 'nullable|numeric|min:0',
             'con_factura'                => 'required|boolean',
         ]);
@@ -49,7 +51,8 @@ class VentaController extends Controller
                 'tipo_pago_id'    => $request->tipo_pago_id,
                 'descuento_total' => $request->descuento_total ?? 0,
                 'con_factura'     => (bool) ($request->con_factura ?? false),
-                'total'           => 0
+                'total'           => 0,
+                'estado'          => 'vigente', // por defecto
             ]);
 
             $totalFinal = 0;
@@ -70,13 +73,13 @@ class VentaController extends Controller
                     'subtotal'       => $subtotal
                 ]);
 
-                // Registrar en Kardex como Salida (Venta)
+                // Kardex salida
                 InventarioService::salidaNormal(
                     $request->sucursal_id,
                     $p['producto_id'],
                     $cantidad,
                     $precio,
-                    'Venta', // documento_tipo
+                    'Venta',
                     $venta->id,
                     auth()->id()
                 );
@@ -87,7 +90,7 @@ class VentaController extends Controller
             ]);
 
             DB::commit();
-            return redirect()->route('ventas.create')->with('success', 'Venta registrada correctamente.');
+            return redirect()->route('ventas.index')->with('success', 'Venta registrada correctamente.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Error al registrar venta: ' . $e->getMessage());
@@ -119,12 +122,13 @@ class VentaController extends Controller
         return $pdf->stream("ticket_venta_{$venta->id}.pdf");
     }
 
-    /**
-     * Anular una venta y devolver el stock
-     */
     public function anular($id)
     {
         $venta = Venta::with('detalles')->findOrFail($id);
+
+        if ($venta->estado === 'anulada') {
+            return redirect()->route('ventas.index')->with('error', 'Esta venta ya fue anulada.');
+        }
 
         DB::transaction(function () use ($venta) {
             foreach ($venta->detalles as $detalle) {
@@ -133,11 +137,16 @@ class VentaController extends Controller
                     $detalle->producto_id,
                     $detalle->cantidad,
                     $detalle->precio_unitario,
-                    'Anulación Venta', // documento_tipo
+                    'Reversión Venta',
                     $venta->id,
                     auth()->id()
                 );
             }
+
+            $venta->update([
+                'estado'      => 'anulada',
+                'observacion' => 'Venta anulada el ' . now()->format('Y-m-d H:i'),
+            ]);
         });
 
         return redirect()->route('ventas.index')->with('success', 'Venta anulada y stock devuelto.');

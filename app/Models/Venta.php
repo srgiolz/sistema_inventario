@@ -9,15 +9,17 @@ class Venta extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'cliente_id',
-        'sucursal_id',
-        'fecha',
-        'tipo_pago_id',   // <-- nombre correcto en BD
-        'descuento_total',
-        'total',
-        'con_factura',
-    ];
+   protected $fillable = [
+    'cliente_id',
+    'sucursal_id',
+    'fecha',
+    'tipo_pago_id',
+    'descuento_total',
+    'total',
+    'con_factura',
+    'estado',        // nuevo
+    'observacion',   // nuevo
+];
 
     protected $casts = [
         'con_factura' => 'boolean',
