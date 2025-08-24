@@ -78,12 +78,15 @@ class TraspasoController extends Controller
     }
 
     public function index()
-    {
-        $traspasos = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])
-            ->latest()->get();
+{
+    $traspasos = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])
+        ->latest()->get();
 
-        return view('traspasos.index', compact('traspasos'));
-    }
+    $pendientesCount = Traspaso::where('estado', 'pendiente')->count();
+
+    return view('traspasos.index', compact('traspasos', 'pendientesCount'));
+}
+
 
     public function productosPorSucursal($idSucursal, Request $request)
     {
@@ -136,51 +139,89 @@ class TraspasoController extends Controller
 }
 
 
-    public function edit($id)
-    {
-        $traspaso = Traspaso::with('detalles.producto')->findOrFail($id);
+public function edit($id)
+{
+    $traspaso = Traspaso::with('detalles.producto')->findOrFail($id);
+    $sucursales = Sucursal::all();
 
-        return view('traspasos.edit', compact('traspaso'));
-    }
+    return view('traspasos.edit', compact('traspaso', 'sucursales'));
+}
+
 
     public function update(Request $request, $id)
-    {
-        $traspaso = Traspaso::findOrFail($id);
+{
+    $traspaso = Traspaso::with('detalles')->findOrFail($id);
 
-        if ($traspaso->estado !== 'pendiente') {
-            return redirect()->route('traspasos.index')
-                ->with('error', 'Solo se pueden editar traspasos en estado pendiente.');
+    // 🔒 Solo pendiente se puede editar
+    if ($traspaso->estado !== 'pendiente') {
+        return redirect()->route('traspasos.index')
+            ->with('error', 'Solo se pueden editar traspasos en estado pendiente.');
+    }
+
+    // ✅ Validaciones fuertes
+    $request->validate([
+        'de_sucursal' => 'required|different:a_sucursal|exists:sucursales,id',
+        'a_sucursal'  => 'required|exists:sucursales,id',
+        'productos'   => 'required|array|min:1',
+        'productos.*.producto_id' => 'required|exists:productos,id',
+        'productos.*.cantidad'    => 'required|integer|min:1',
+    ], [
+        'productos.required' => 'Debes agregar al menos un producto.',
+        'productos.*.cantidad.min' => 'La cantidad debe ser mayor a 0.',
+    ]);
+
+    // 🚫 Evitar duplicados en el request
+    $idsProductos = array_column($request->productos, 'producto_id');
+    if (count($idsProductos) !== count(array_unique($idsProductos))) {
+        return back()->withErrors(['error' => '❌ No puedes repetir el mismo producto.'])->withInput();
+    }
+
+    DB::transaction(function () use ($request, $traspaso) {
+        // 🔒 Bloquear cambio de ORIGEN si ya había detalles
+        if ($traspaso->detalles()->count() > 0) {
+            $origenId = $traspaso->sucursal_origen_id;
+        } else {
+            $origenId = $request->de_sucursal;
         }
 
-        $request->validate([
-            'de_sucursal' => 'required|different:a_sucursal',
-            'a_sucursal'  => 'required',
-            'productos'   => 'required|array|min:1',
+        // ✅ Actualizar cabecera (origen, destino, observación)
+        $traspaso->update([
+            'sucursal_origen_id'  => $origenId,
+            'sucursal_destino_id' => $request->a_sucursal,
+            'observacion'         => $request->observacion,
         ]);
 
-        DB::transaction(function () use ($request, $traspaso) {
-            // Actualizar datos principales
-            $traspaso->update([
-                'sucursal_origen_id'  => $request->de_sucursal,
-                'sucursal_destino_id' => $request->a_sucursal,
-                'observacion' => $request->observacion,
-            ]);
+        // ✅ Manejo de detalles
+        $detallesExistentes = $traspaso->detalles->keyBy('producto_id');
+        $productosEnviados = collect($request->productos)->keyBy('producto_id');
 
-            // Eliminar detalles anteriores
-            $traspaso->detalles()->delete();
-
-            // Insertar los nuevos detalles
-            foreach ($request->productos as $prod) {
+        // 1. Actualizar cantidades o crear nuevos
+        foreach ($productosEnviados as $prodId => $data) {
+            if ($detallesExistentes->has($prodId)) {
+                $detallesExistentes[$prodId]->update([
+                    'cantidad' => $data['cantidad'],
+                ]);
+            } else {
                 $traspaso->detalles()->create([
-                    'producto_id' => $prod['producto_id'],
-                    'cantidad'    => $prod['cantidad'],
+                    'producto_id' => $prodId,
+                    'cantidad'    => $data['cantidad'],
                 ]);
             }
-        });
+        }
 
-        return redirect()->route('traspasos.index')
-            ->with('success', 'El traspaso fue actualizado correctamente.');
-    }
+        // 2. Eliminar productos que ya no están en el request
+        $idsEnviados = $productosEnviados->keys();
+        foreach ($detallesExistentes as $prodId => $detalle) {
+            if (!$idsEnviados->contains($prodId)) {
+                $detalle->delete();
+            }
+        }
+    });
+
+    return redirect()->route('traspasos.index')
+        ->with('success', '✅ El traspaso fue actualizado correctamente.');
+}
+
 
     public function confirmar(Traspaso $traspaso)
     {

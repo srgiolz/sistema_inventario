@@ -8,9 +8,26 @@
         Historial de <span class="fw-bold">Traspasos</span>
     </h4>
 
-    <a href="{{ route('traspasos.create') }}" class="btn btn-primary mb-4 shadow-sm">
-        <i class="bi bi-plus-circle me-1"></i> Nuevo Traspaso
-    </a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        {{-- Botón Nuevo Traspaso --}}
+        <a href="{{ route('traspasos.create') }}" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-circle me-1"></i> Nuevo Traspaso
+        </a>
+
+        {{-- Botón Pendientes con contador fijo en rojo --}}
+        <a href="{{ route('traspasos.pendientes') }}" 
+           class="btn btn-sm btn-outline-warning shadow-sm" 
+           data-bs-toggle="tooltip" 
+           data-bs-placement="left" 
+           title="Ver traspasos pendientes">
+            <i class="bi bi-hourglass-split me-1"></i> Pendientes
+            @if($pendientesCount > 0)
+                <span class="badge bg-danger ms-1">
+                    {{ $pendientesCount }}
+                </span>
+            @endif
+        </a>
+    </div>
 
     @foreach($traspasos as $t)
         <div class="card mb-4 border-0 shadow-sm rounded-3">
@@ -86,4 +103,18 @@
     @endforeach
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+@endpush
+
+
+
 

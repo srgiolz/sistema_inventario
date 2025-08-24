@@ -15,7 +15,6 @@ use App\Http\Controllers\KardexController;
 // Rutas protegidas por auth
 Route::middleware(['auth'])->group(function () {
     
-
     // 🏠 Panel principal
     Route::get('/', [PanelController::class, 'index'])->name('panel.index');
     Route::get('/panel/filtrar-productos', [PanelController::class, 'filtrarProductosSinVentas'])->name('panel.filtrar-productos');
@@ -29,35 +28,37 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('ventas', VentaController::class);
     Route::patch('/ventas/{id}/anular', [VentaController::class, 'anular'])->name('ventas.anular');
 
-    //Inventario/Entradas
+    // Inventario/Entradas
     Route::resource('entradas', EntradaController::class);
     Route::post('/entradas/{id}/reversar', [EntradaController::class, 'reversar'])->name('entradas.reversar');
     Route::get('/entradas/{id}/editar', [EntradaController::class, 'edit'])->name('entradas.edit');
     Route::put('entradas/{id}', [EntradaController::class, 'update'])->name('entradas.update');
     Route::get('/entradas/{id}/pdf', [EntradaController::class, 'generarPdf'])->name('entradas.pdf');
 
-    //Inventario/Salidas
+    // Inventario/Salidas
     Route::resource('salidas', SalidaController::class);
-    Route::get('/salidas/{id}/pdf', [\App\Http\Controllers\SalidaController::class, 'generarPdf'])->name('salidas.pdf');
-    Route::post('/salidas/{id}/reversar', [\App\Http\Controllers\SalidaController::class, 'reversar'])->name('salidas.reversar');
-    Route::get('/salidas/{id}/edit', [\App\Http\Controllers\SalidaController::class, 'edit'])->name('salidas.edit');
-    Route::put('/salidas/{id}', [\App\Http\Controllers\SalidaController::class, 'update'])->name('salidas.update');
+    Route::get('/salidas/{id}/pdf', [SalidaController::class, 'generarPdf'])->name('salidas.pdf');
+    Route::post('/salidas/{id}/reversar', [SalidaController::class, 'reversar'])->name('salidas.reversar');
+    Route::get('/salidas/{id}/edit', [SalidaController::class, 'edit'])->name('salidas.edit');
+    Route::put('/salidas/{id}', [SalidaController::class, 'update'])->name('salidas.update');
 
-    
-    Route::resource('traspasos', TraspasoController::class);
+    // API productos para traspasos
     Route::get('/api/productos-por-sucursal/{idSucursal}', [TraspasoController::class, 'productosPorSucursal'])
-    ->name('api.productosPorSucursal');
+        ->name('api.productosPorSucursal');
 
-    // 📄 PDF y revisión de traspasos
+    // 📄 PDF, revisión y pendientes de traspasos
+    Route::get('/traspasos/pendientes', [TraspasoController::class, 'pendientes'])->name('traspasos.pendientes');
     Route::get('/traspasos/{traspaso}/pdf', [TraspasoController::class, 'generarPDF'])->name('traspasos.pdf');
     Route::get('/traspasos/{traspaso}/revisar', [TraspasoController::class, 'revisar'])->name('traspasos.revisar');
     Route::patch('/traspasos/{traspaso}/confirmar', [TraspasoController::class, 'confirmar'])->name('traspasos.confirmar');
     Route::patch('/traspasos/{traspaso}/rechazar', [TraspasoController::class, 'rechazar'])->name('traspasos.rechazar');
-    Route::get('/traspasos/pendientes', [TraspasoController::class, 'pendientes'])->name('traspasos.pendientes');
 
     // 🔄 Editar traspasos
     Route::get('/traspasos/{id}/editar', [TraspasoController::class, 'edit'])->name('traspasos.edit');
     Route::put('/traspasos/{id}', [TraspasoController::class, 'update'])->name('traspasos.update');
+
+    // 📦 Recurso principal de traspasos (debe ir al final para no pisar tus rutas personalizadas)
+    Route::resource('traspasos', TraspasoController::class);
 
     // 📊 Panel decisiones
     Route::get('/panel-decisiones', [PanelDecisionesController::class, 'index'])->name('panel-decisiones');
