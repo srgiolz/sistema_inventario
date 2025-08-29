@@ -56,6 +56,21 @@
             border: none;
         }
 
+        /* Encabezado del sidebar */
+        .sidebar-header {
+            padding-left: 10px;   /* margen uniforme a la izquierda */
+            line-height: 1.2;     /* separación entre título y subtítulo */
+        }
+        .sidebar-header h4 {
+    margin: 0;
+    font-weight: 400;   /* normal */
+    font-size: 2rem;  /* más grande que el default */
+        }
+        .sidebar-header small {
+            display: block;
+            color: #bbb;
+        }
+
         /* Select2 estilos */
         .select2-container--default .select2-selection--single .select2-selection__rendered {
             white-space: normal !important;
@@ -89,8 +104,10 @@
 <div class="d-flex">
     <!-- Sidebar -->
     <div class="sidebar p-3">
-        <h4 class="mb-0"><i class="bi bi-bar-chart-line"></i> YatiñaSoft</h4>
-        <small class="text-white-50 ms-1">Gestión con conocimiento</small>
+        <div class="sidebar-header mb-3">
+            <h4 class="mb-0">SINVARIS</h4>
+            <small>Gestión con conocimiento</small>
+        </div>
 
         <nav class="nav flex-column mt-3">
             <!-- 1. Panel Principal -->
@@ -134,7 +151,7 @@
                 <i class="bi bi-graph-up-arrow me-2"></i> Reportes
             </a>
             <a href="{{ route('kardex.index') }}" class="nav-link {{ request()->routeIs('kardex.*') ? 'active' : '' }}">
-            <i class="bi bi-journal-text me-2"></i> Kardex
+                <i class="bi bi-journal-text me-2"></i> Kardex
             </a>
 
             <!-- 5. Admin -->

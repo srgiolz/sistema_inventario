@@ -5,7 +5,7 @@
 
                 <!-- Logo dentro del card -->
 <div class="mb-4 text-center">
-    <img src="{{ asset('images/yatinasoft_logo.png') }}" 
+    <img src="{{ asset('images/sinvaris_logo.png') }}" 
          alt="YatiñaSoft Logo" 
          style="width: 250px; max-width: 100%;">
 </div>
