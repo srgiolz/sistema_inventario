@@ -1,156 +1,109 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <title>Guía de Traspaso #{{ $traspaso->id }}</title>
     <style>
-        /* ===== Página compacta (media hoja aprox.) ===== */
-        @page { margin: 12mm 10mm; } /* márgenes pequeños */
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 11px; color: #1f2937; line-height: 1.25; }
-
-        .row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-        .muted { color:#6b7280; }
-
-        /* Encabezado compacto */
-        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 6mm; }
-        .brand { font-size: 14px; font-weight: 700; letter-spacing: .2px; margin-bottom: 2px; }
-        .title { font-size: 13px; font-weight: 700; }
-        .meta { text-align:right; font-size: 10.5px; }
-        .meta .rowline { margin: 1px 0; }
-        .pill { display:inline-block; padding: 0 6px; border-radius: 999px; font-size: 10px; line-height: 1.6; vertical-align: middle; }
-        .pill-pendiente { background:#fef3c7; color:#92400e; }
-        .pill-confirmado { background:#dcfce7; color:#166534; }
-        .pill-rechazado { background:#fee2e2; color:#991b1b; }
-
-        /* Tarjetas y layout apretado */
-        .section { margin-bottom: 6mm; }
-        .card { border:1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px; }
-        .card h4 { margin: 0 0 4px; font-size: 11.5px; color:#374151; }
-        .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
-        .label { color:#6b7280; }
-        .value { font-weight: 600; }
-
-        /* Tabla muy compacta */
-        table { width:100%; border-collapse: collapse; }
-        th, td { border: 1px solid #e5e7eb; padding: 6px 8px; }
-        thead th { background:#f3f4f6; color:#374151; font-weight: 700; font-size: 11px; }
-        tbody tr:nth-child(even) { background:#fafafa; }
-        td.qty, th.qty { text-align:center; width: 70px; }
-        td.code { white-space: nowrap; width: 120px; font-family: monospace; font-size: 10.5px; }
-        .tight { margin-top: 2mm; }
-
-        /* Totales y nota */
-        .totals { margin-top: 3px; text-align: right; font-size: 10.5px; }
-        .note { margin-top: 2px; color:#6b7280; font-size: 10px; }
-
-        /* Firmas compactas */
-        .sign-row { display:flex; justify-content:space-between; gap: 16px; margin-top: 8mm; }
-        .sign { flex:1; text-align:center; }
-        .sign .line { margin: 16mm 0 4px; border:none; border-top:1px solid #111827; }
-        .sign .who { font-weight: 600; font-size: 10.5px; }
-        .sign .hint { color:#6b7280; font-size: 10px; }
-
-        /* Footer chico (opcional) */
-        .footer { position: fixed; bottom: 8mm; left: 10mm; right: 10mm; display:flex; justify-content:space-between; color:#6b7280; font-size: 9.5px; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #333; }
+        h2, h4 { margin: 0; padding: 0; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        table th, table td { border: 1px solid #ddd; padding: 6px; }
+        table th { background: #f5f5f5; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .fw-bold { font-weight: bold; }
+        .estado { font-size: 13px; padding: 5px 10px; border-radius: 4px; }
+        .pendiente { background: #ffeeba; color: #856404; }
+        .transito { background: #bee5eb; color: #0c5460; }
+        .confirmado { background: #c3e6cb; color: #155724; }
+        .anulado { background: #f5c6cb; color: #721c24; }
     </style>
 </head>
 <body>
+    <table width="100%">
+        <tr>
+            <td>
+                <h2>📦 Guía de Traspaso</h2>
+                <h4>#{{ $traspaso->id }}</h4>
+            </td>
+            <td class="text-right">
+                <div class="estado
+                    @if($traspaso->estado == 'pendiente') pendiente
+                    @elseif($traspaso->estado == 'confirmado_origen') transito
+                    @elseif($traspaso->estado == 'confirmado_destino') confirmado
+                    @elseif($traspaso->estado == 'anulado') anulado
+                    @endif">
+                    @if($traspaso->estado == 'pendiente') Pendiente
+                    @elseif($traspaso->estado == 'confirmado_origen') En tránsito
+                    @elseif($traspaso->estado == 'confirmado_destino') Confirmado en destino
+                    @elseif($traspaso->estado == 'anulado') Anulado
+                    @endif
+                </div>
+            </td>
+        </tr>
+    </table>
 
-    {{-- Encabezado --}}
-    <div class="header">
-        <div>
-            <div class="brand">YatiñaSoft</div>
-            <div class="title">Guía de Traspaso Interno</div>
-        </div>
-        <div class="meta">
-            <div class="rowline"><strong>N°:</strong> #{{ $traspaso->id }}</div>
-            <div class="rowline"><strong>Tipo:</strong> {{ ucfirst($traspaso->tipo) }}</div>
-            <div class="rowline">
-                <strong>Estado:</strong>
-                @php($estado = $traspaso->estado)
-                @if($estado === 'pendiente')
-                    <span class="pill pill-pendiente">Pendiente</span>
-                @elseif($estado === 'confirmado')
-                    <span class="pill pill-confirmado">Confirmado</span>
-                @else
-                    <span class="pill pill-rechazado">Rechazado</span>
-                @endif
-            </div>
-            <div class="rowline"><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($traspaso->fecha)->format('d/m/Y') }}</div>
-        </div>
-    </div>
+    <hr>
 
-    {{-- Resumen (apretado) --}}
-    <div class="section">
-        <div class="grid2">
-            <div class="card">
-                <h4>Sucursales</h4>
-                <div><span class="label">Origen:</span> <span class="value">{{ $traspaso->sucursalOrigen->nombre }}</span></div>
-                <div><span class="label">Destino:</span> <span class="value">{{ $traspaso->sucursalDestino->nombre }}</span></div>
-            </div>
-            <div class="card">
-                <h4>Detalle</h4>
-                <div><span class="label">Observación:</span> <span class="value">{{ $traspaso->observacion ?? 'Ninguna' }}</span></div>
-                @if($traspaso->fecha_confirmacion)
-                    <div><span class="label">Confirmado el:</span> <span class="value">{{ \Carbon\Carbon::parse($traspaso->fecha_confirmacion)->format('d/m/Y H:i') }}</span></div>
-                @endif
-            </div>
-        </div>
-    </div>
+    {{-- Información general --}}
+    <table>
+        <tr>
+            <th width="25%">Sucursal Origen</th>
+            <td>{{ $traspaso->sucursalOrigen->nombre }}</td>
+            <th width="25%">Sucursal Destino</th>
+            <td>{{ $traspaso->sucursalDestino->nombre }}</td>
+        </tr>
+        <tr>
+            <th>Fecha</th>
+            <td>{{ \Carbon\Carbon::parse($traspaso->fecha)->format('d/m/Y') }}</td>
+            <th>Tipo</th>
+            <td>{{ ucfirst($traspaso->tipo) }}</td>
+        </tr>
+        <tr>
+            <th>Observación</th>
+            <td colspan="3">{{ $traspaso->observacion ?? 'Ninguna' }}</td>
+        </tr>
+        @if($traspaso->estado == 'anulado' && $traspaso->motivo_anulacion)
+        <tr>
+            <th>Motivo anulación</th>
+            <td colspan="3">{{ $traspaso->motivo_anulacion }}</td>
+        </tr>
+        @endif
+    </table>
 
-    {{-- Tabla productos (compacta) --}}
-    <table class="tight">
+    {{-- Productos --}}
+    <h4 style="margin-top:20px;">📝 Productos del Traspaso</h4>
+    <table>
         <thead>
-            <tr>
-                <th style="width:36px">#</th>
-                <th style="width:120px">Código</th>
+            <tr class="text-center">
+                <th style="width:15%">Código</th>
                 <th>Descripción</th>
-                <th class="qty">Cantidad</th>
+                <th style="width:15%">Cantidad</th>
             </tr>
         </thead>
         <tbody>
-        @php($totalItems = 0)
-        @foreach ($traspaso->detalles as $i => $detalle)
-            @php($totalItems += (int)$detalle->cantidad)
-            <tr>
-                <td class="qty">{{ $i + 1 }}</td>
-                <td class="code">{{ $detalle->producto->codigo_item }}</td>
-                <td>{{ $detalle->producto->descripcion }}</td>
-                <td class="qty"><strong>{{ $detalle->cantidad }}</strong></td>
-            </tr>
-        @endforeach
+            @foreach($traspaso->detalles as $detalle)
+                <tr>
+                    <td class="text-center">{{ $detalle->producto->codigo_item }}</td>
+                    <td>{{ $detalle->producto->descripcion }}</td>
+                    <td class="text-center fw-bold">{{ $detalle->cantidad }}</td>
+                </tr>
+            @endforeach
         </tbody>
     </table>
 
-    <div class="totals">
-        <strong>Ítems:</strong> {{ $traspaso->detalles->count() }} &nbsp;|&nbsp;
-        <strong>Unidades:</strong> {{ $totalItems }}
-    </div>
-
-    <div class="note">
-        Movimiento interno entre sucursales. El stock se afecta según el estado del traspaso.
-    </div>
-
-    {{-- Firmas (compactas) --}}
-    <div class="sign-row">
-        <div class="sign">
-            <hr class="line">
-            <div class="who">Entregado por</div>
-            <div class="hint">Nombre y firma</div>
-        </div>
-        <div class="sign">
-            <hr class="line">
-            <div class="who">Recibido por</div>
-            <div class="hint">Nombre y firma</div>
-        </div>
-    </div>
-
-    {{-- Footer pequeño (opcional, quítalo si no quieres ocupar espacio) --}}
-    <div class="footer">
-        <div>Emitido: {{ now()->format('d/m/Y H:i') }}</div>
-        <div>YatiñaSoft</div>
-        <div>Página 1 de 1</div>
-    </div>
-
+    {{-- Firmas --}}
+    <table style="margin-top:40px;">
+        <tr>
+            <td class="text-center" style="width:50%">
+                ___________________________<br>
+                <small><b>Entrega (Origen)</b></small>
+            </td>
+            <td class="text-center" style="width:50%">
+                ___________________________<br>
+                <small><b>Recepción (Destino)</b></small>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

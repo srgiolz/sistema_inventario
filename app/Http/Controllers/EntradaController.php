@@ -16,13 +16,7 @@ class EntradaController extends Controller
     public function index()
     {
         $entradas = Entrada::with(['sucursal', 'detalles.producto'])->latest()->get();
-
-        $idsReversadas = Entrada::where('observacion', 'like', 'Reversión de entrada #%')
-            ->pluck('observacion')
-            ->map(fn($obs) => (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT))
-            ->toArray();
-
-        return view('entradas.index', compact('entradas', 'idsReversadas'));
+        return view('entradas.index', compact('entradas'));
     }
 
     public function create()
@@ -50,6 +44,7 @@ class EntradaController extends Controller
                 'fecha' => $request->fecha,
                 'tipo' => $request->tipo,
                 'observacion' => $request->observacion,
+                'estado' => 'pendiente',
             ]);
 
             foreach ($request->productos as $producto) {
@@ -57,80 +52,20 @@ class EntradaController extends Controller
                     'entrada_id' => $entrada->id,
                     'producto_id' => $producto['producto_id'],
                     'cantidad' => $producto['cantidad'],
-                    'precio_unitario' => $producto['precio_unitario'] ?? null,
+                    'precio_unitario' => $producto['precio_unitario'] ?? 0,
                 ]);
-
-                // Usar el servicio para mover stock y registrar Kardex
-                InventarioService::entradaNormal(
-                    $request->sucursal_id,
-                    $producto['producto_id'],
-                    $producto['cantidad'],
-                    $producto['precio_unitario'] ?? 0,
-                    'Entrada',
-                    $entrada->id,
-                    auth()->id()
-                );
             }
         });
 
-        return redirect()->route('entradas.index')->with('success', 'Entrada registrada correctamente.');
-    }
-
-    public function reversar($id)
-    {
-        $entradaOriginal = Entrada::with('detalles.producto')->findOrFail($id);
-
-        // Validar que haya stock suficiente para revertir
-        foreach ($entradaOriginal->detalles as $detalle) {
-            $stockActual = \App\Models\Inventario::where('producto_id', $detalle->producto_id)
-                ->where('sucursal_id', $entradaOriginal->sucursal_id)
-                ->value('cantidad') ?? 0;
-
-            if ($stockActual < $detalle->cantidad) {
-                return redirect()->route('entradas.index')
-                    ->with('error', 'No se puede reversar: stock insuficiente del producto "' . $detalle->producto->descripcion . '"');
-            }
-        }
-
-        DB::transaction(function () use ($entradaOriginal) {
-            $entradaReversa = Entrada::create([
-                'sucursal_id' => $entradaOriginal->sucursal_id,
-                'fecha' => now()->format('Y-m-d'),
-                'tipo' => $entradaOriginal->tipo,
-                'observacion' => 'Reversión de entrada #' . $entradaOriginal->id,
-            ]);
-
-            foreach ($entradaOriginal->detalles as $detalle) {
-                DetalleEntrada::create([
-                    'entrada_id' => $entradaReversa->id,
-                    'producto_id' => $detalle->producto_id,
-                    'cantidad' => -$detalle->cantidad,
-                    'precio_unitario' => $detalle->precio_unitario,
-                ]);
-
-                // Usar el servicio para restar stock
-                InventarioService::salidaNormal(
-    $entradaOriginal->sucursal_id,
-    $detalle->producto_id,
-    $detalle->cantidad,
-    $detalle->precio_unitario ?? 0,
-    'Reversión Entrada',
-    $entradaReversa->id,
-    auth()->id(),
-    'Reversión de entrada #' . $entradaOriginal->id
-);
-            }
-        });
-
-        return redirect()->route('entradas.index')->with('success', 'Entrada reversada correctamente.');
+        return redirect()->route('entradas.index')->with('success', 'Entrada registrada en estado PENDIENTE.');
     }
 
     public function edit($id)
     {
         $entrada = Entrada::with('detalles')->findOrFail($id);
 
-        if (!\Carbon\Carbon::parse($entrada->fecha)->isToday()) {
-            return redirect()->route('entradas.index')->with('error', 'Solo puedes editar entradas del mismo día.');
+        if ($entrada->estado !== 'pendiente') {
+            return redirect()->route('entradas.index')->with('error', 'Solo se pueden editar entradas en estado PENDIENTE.');
         }
 
         $productos = Producto::all();
@@ -141,10 +76,10 @@ class EntradaController extends Controller
 
     public function update(Request $request, $id)
     {
-        $entrada = Entrada::findOrFail($id);
+        $entrada = Entrada::with('detalles')->findOrFail($id);
 
-        if (!\Carbon\Carbon::parse($entrada->fecha)->isToday()) {
-            return redirect()->route('entradas.index')->with('error', 'Solo se pueden editar entradas del mismo día.');
+        if ($entrada->estado !== 'pendiente') {
+            return redirect()->route('entradas.index')->with('error', 'Esta entrada ya no puede modificarse.');
         }
 
         $request->validate([
@@ -157,53 +92,93 @@ class EntradaController extends Controller
             'productos.*.precio_unitario' => 'nullable|numeric|min:0',
         ]);
 
-        $productosIds = collect($request->productos)->pluck('producto_id');
-        if ($productosIds->duplicates()->isNotEmpty()) {
-            return back()->withErrors(['productos' => 'No se permiten productos duplicados.'])->withInput();
+        DB::transaction(function () use ($request, $entrada) {
+    $entrada->update([
+        'fecha' => $request->fecha,
+        'tipo' => $request->tipo,
+        'observacion' => $request->observacion,
+        'sucursal_id' => $request->sucursal_id, // 🔹 AÑADIR ESTO
+    ]);
+
+    $entrada->detalles()->delete();
+
+    foreach ($request->productos as $producto) {
+        $entrada->detalles()->create([
+            'producto_id' => $producto['producto_id'],
+            'cantidad' => $producto['cantidad'],
+            'precio_unitario' => $producto['precio_unitario'] ?? 0,
+        ]);
+    }
+});
+
+
+        return redirect()->route('entradas.index')->with('success', 'Entrada actualizada correctamente.');
+    }
+
+    public function confirmar($id)
+    {
+        $entrada = Entrada::with('detalles')->findOrFail($id);
+
+        if ($entrada->estado !== 'pendiente') {
+            return back()->withErrors('Solo se pueden confirmar entradas en estado PENDIENTE.');
         }
 
-        DB::transaction(function () use ($request, $entrada) {
-            $entrada->update([
-                'fecha' => $request->fecha,
-                'tipo' => $request->tipo,
-                'observacion' => $request->observacion,
-            ]);
-
-            // Eliminar detalles antiguos y ajustar inventario (reversa de lo anterior)
+        DB::transaction(function () use ($entrada) {
             foreach ($entrada->detalles as $detalle) {
-                InventarioService::salidaNormal(
+                InventarioService::entradaNormal(
                     $entrada->sucursal_id,
                     $detalle->producto_id,
                     $detalle->cantidad,
                     $detalle->precio_unitario ?? 0,
-                    'Edición Entrada',
-                    $entrada->id,
-                    auth()->id()
-                );
-                $detalle->delete();
-            }
-
-            // Insertar nuevos detalles y sumar al inventario
-            foreach ($request->productos as $producto) {
-                $entrada->detalles()->create([
-                    'producto_id' => $producto['producto_id'],
-                    'cantidad' => $producto['cantidad'],
-                    'precio_unitario' => $producto['precio_unitario'] ?? 0,
-                ]);
-
-                InventarioService::entradaNormal(
-                    $entrada->sucursal_id,
-                    $producto['producto_id'],
-                    $producto['cantidad'],
-                    $producto['precio_unitario'] ?? 0,
-                    'Edición Entrada',
+                    'ENTRADA',
                     $entrada->id,
                     auth()->id()
                 );
             }
+
+            $entrada->update([
+                'estado' => 'confirmado',
+                'fecha_confirmacion' => now(),
+                'usuario_confirma_id' => auth()->id(),
+            ]);
         });
 
-        return redirect()->route('entradas.index')->with('success', 'Entrada actualizada correctamente.');
+        return redirect()->route('entradas.index')->with('success', 'Entrada confirmada correctamente.');
+    }
+
+    public function anular(Request $request, $id)
+    {
+        $entrada = Entrada::with('detalles')->findOrFail($id);
+
+        if ($entrada->estado !== 'confirmado') {
+            return back()->withErrors('Solo se pueden anular entradas en estado CONFIRMADO.');
+        }
+
+        $request->validate([
+            'motivo' => 'required|string|max:255',
+        ]);
+
+        DB::transaction(function () use ($entrada, $request) {
+            foreach ($entrada->detalles as $detalle) {
+    InventarioService::anulacion(
+        $entrada->sucursal_id,
+        $detalle->producto_id,
+        $detalle->cantidad,
+        $detalle->precio_unitario ?? 0,
+        'ENTRADA',   // 🔹 documento original
+        $entrada->id,
+        auth()->id(),
+        $request->motivo
+    );
+}
+
+            $entrada->update([
+                'estado' => 'anulado',
+                'motivo_anulacion' => $request->motivo,
+            ]);
+        });
+
+        return redirect()->route('entradas.index')->with('success', 'Entrada anulada correctamente.');
     }
 
     public function generarPdf($id)

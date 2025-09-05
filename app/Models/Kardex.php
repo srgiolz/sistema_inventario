@@ -17,7 +17,8 @@ class Kardex extends Model
         'documento_tipo',
         'documento_id',
         'usuario_id',
-        'fecha'
+        'fecha',
+        'doc_ref',   
     ];
 
     // Relaciones opcionales

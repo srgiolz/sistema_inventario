@@ -14,6 +14,17 @@
         </a>
     </div>
 
+    {{-- Mensajes de error --}}
+    @if($errors->any())
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                @foreach($errors->all() as $e)
+                    <li>{{ $e }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-body">
 
@@ -39,7 +50,7 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-semibold">A sucursal (destino)</label>
-                        <select name="a_sucursal" class="form-select" required>
+                        <select name="a_sucursal" id="a_sucursal" class="form-select" required>
                             <option value="">— Seleccionar —</option>
                             @foreach($sucursales as $s)
                                 <option value="{{ $s->id }}">{{ $s->nombre }}</option>
@@ -88,8 +99,8 @@
                 <div class="d-flex justify-content-end gap-2 mt-3">
                     <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary">Cancelar</a>
                     <button type="button" id="btnRegistrar" class="btn btn-primary">
-    <i class="bi bi-check2-circle me-1"></i> Registrar traspaso
-</button>
+                        <i class="bi bi-check2-circle me-1"></i> Registrar traspaso
+                    </button>
                 </div>
             </form>
         </div>
@@ -114,7 +125,6 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 
 <script>
 let index = 0;
@@ -176,6 +186,12 @@ $(function () {
     $('#agregar-producto').on('click', crearFilaProducto);
     $('#tabla-productos').on('click', '.eliminar', function () { $(this).closest('tr').remove(); });
 
+    // ✅ Limpiar tabla si cambia sucursal de origen
+    $('#de_sucursal').on('change', function () {
+        $('#tabla-productos tbody').empty();
+        index = 0;
+    });
+
     // ✅ Evitar productos duplicados en la tabla
     $('#tabla-productos').on('change', '.select-producto', function () {
         const seleccionado = $(this).val();
@@ -195,6 +211,7 @@ $(function () {
         }
     });
 
+    // Validación antes de enviar
     $('form').on('submit', function (e) {
         let ok = true;
         $('#tabla-productos tbody tr').each(function () {
@@ -209,9 +226,10 @@ $(function () {
         if (!ok) e.preventDefault();
     });
 });
+
+// Confirmación con SweetAlert
 $('#btnRegistrar').on('click', function (e) {
     e.preventDefault();
-
     Swal.fire({
         title: '¿Registrar traspaso?',
         text: 'Verifica que los productos y cantidades sean correctos.',
@@ -226,9 +244,7 @@ $('#btnRegistrar').on('click', function (e) {
         }
     });
 });
-
 </script>
-
 @endpush
 @endsection
 

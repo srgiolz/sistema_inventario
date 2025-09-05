@@ -8,14 +8,23 @@ use App\Models\Sucursal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\DetalleSalida;
-use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\InventarioService;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class SalidaController extends Controller
 {
+    public function index()
+    {
+        $salidas = Salida::with('detalles.producto', 'sucursal')
+            ->orderBy('id', 'desc')
+            ->paginate(15);
+
+        return view('salidas.index', compact('salidas'));
+    }
+
     public function create()
     {
-        $productos = Producto::all();
+        $productos = Producto::where('activo', 1)->get();
         $sucursales = Sucursal::all();
         return view('salidas.create', compact('productos', 'sucursales'));
     }
@@ -40,6 +49,7 @@ class SalidaController extends Controller
                 'tipo' => $request->tipo,
                 'motivo' => $request->motivo,
                 'observacion' => $request->observacion,
+                'estado' => 'pendiente',
             ]);
 
             foreach ($request->productos as $item) {
@@ -48,43 +58,21 @@ class SalidaController extends Controller
                     'producto_id' => $item['producto_id'],
                     'cantidad' => $item['cantidad'],
                 ]);
-
-                // Usar el servicio para restar stock y registrar en Kardex
-                InventarioService::salidaNormal(
-                    $request->sucursal_id,
-                    $item['producto_id'],
-                    $item['cantidad'],
-                    0, // Precio no relevante en salida
-                    'Salida',
-                    $salida->id,
-                    auth()->id()
-                );
             }
         });
 
-        return redirect()->route('salidas.index')->with('success', 'Salida registrada exitosamente.');
-    }
-
-    public function index()
-    {
-        $salidas = Salida::with('detalles.producto', 'sucursal')->latest()->get();
-        $idsReversadas = Salida::where('observacion', 'like', 'Reversión de salida #%')
-            ->pluck('observacion')
-            ->map(fn($obs) => (int) filter_var($obs, FILTER_SANITIZE_NUMBER_INT))
-            ->toArray();
-
-        return view('salidas.index', compact('salidas', 'idsReversadas'));
+        return redirect()->route('salidas.index')->with('success', 'Salida registrada en estado pendiente.');
     }
 
     public function edit($id)
     {
         $salida = Salida::with('detalles')->findOrFail($id);
 
-        if (!\Carbon\Carbon::parse($salida->fecha)->isToday()) {
-            return redirect()->route('salidas.index')->with('error', 'Solo puedes editar salidas del mismo día.');
+        if ($salida->estado !== 'pendiente') {
+            return redirect()->route('salidas.index')->with('error', 'Solo se pueden editar salidas pendientes.');
         }
 
-        $productos = Producto::all();
+        $productos = Producto::where('activo', 1)->get();
         $sucursales = Sucursal::all();
 
         return view('salidas.edit', compact('salida', 'productos', 'sucursales'));
@@ -92,10 +80,10 @@ class SalidaController extends Controller
 
     public function update(Request $request, $id)
     {
-        $salida = Salida::findOrFail($id);
+        $salida = Salida::with('detalles')->findOrFail($id);
 
-        if (!\Carbon\Carbon::parse($salida->fecha)->isToday()) {
-            return redirect()->route('salidas.index')->with('error', 'Solo se pueden editar salidas del mismo día.');
+        if ($salida->estado !== 'pendiente') {
+            return redirect()->route('salidas.index')->with('error', 'No se puede editar una salida confirmada o anulada.');
         }
 
         $request->validate([
@@ -110,21 +98,6 @@ class SalidaController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $salida) {
-            // Revertir stock anterior
-            foreach ($salida->detalles as $detalle) {
-                InventarioService::entradaNormal(
-                    $salida->sucursal_id,
-                    $detalle->producto_id,
-                    $detalle->cantidad,
-                    0,
-                    'Edición Salida',
-                    $salida->id,
-                    auth()->id()
-                );
-                $detalle->delete();
-            }
-
-            // Actualizar cabecera
             $salida->update([
                 'fecha' => $request->fecha,
                 'sucursal_id' => $request->sucursal_id,
@@ -133,80 +106,111 @@ class SalidaController extends Controller
                 'observacion' => $request->observacion,
             ]);
 
-            // Nuevos detalles y descuento de stock
+            $salida->detalles()->delete();
+
             foreach ($request->productos as $item) {
                 DetalleSalida::create([
                     'salida_id' => $salida->id,
                     'producto_id' => $item['producto_id'],
                     'cantidad' => $item['cantidad'],
                 ]);
-
-                InventarioService::salidaNormal(
-                    $request->sucursal_id,
-                    $item['producto_id'],
-                    $item['cantidad'],
-                    0,
-                    'Edición Salida',
-                    $salida->id,
-                    auth()->id()
-                );
             }
         });
 
         return redirect()->route('salidas.index')->with('success', 'Salida actualizada correctamente.');
     }
+    
+public function confirm($id)
+{
+    try {
+        DB::transaction(function () use ($id) {
+            $salida = Salida::with('detalles.producto')->findOrFail($id);
+
+            if ($salida->estado !== 'pendiente') {
+                throw new \Exception('Solo se pueden confirmar salidas pendientes.');
+            }
+
+            foreach ($salida->detalles as $detalle) {
+                $ok = InventarioService::salidaNormal(
+                    $salida->sucursal_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'SALIDA',
+                    $salida->id,
+                    auth()->id()
+                );
+
+                // 🚨 Si no hay stock → detener la confirmación
+                if ($ok === false) {
+                    throw new \Exception("Stock insuficiente para el producto: {$detalle->producto->descripcion}");
+                }
+            }
+
+            // 🚀 Solo llega aquí si todos los productos tienen stock
+            $salida->update([
+                'estado' => 'confirmado',
+                'fecha_confirmacion' => now(),
+                'usuario_confirma_id' => auth()->id(),
+            ]);
+        });
+
+        return redirect()->route('salidas.index')->with('success', 'Salida confirmada y stock actualizado.');
+    } catch (\Exception $e) {
+        return redirect()->route('salidas.index')->with('error', $e->getMessage());
+    }
+}
+
+
+public function anular(Request $request, $id)
+{
+    DB::beginTransaction();
+    try {
+        $salida = Salida::with('detalles')->findOrFail($id);
+
+        if ($salida->estado === 'pendiente') {
+            // ❌ Caso 1: Salida en pendiente → nunca afectó inventario
+            $salida->update([
+                'estado' => 'anulado',
+                'motivo_anulacion' => $request->motivo_anulacion ?? 'Anulación de salida pendiente',
+            ]);
+
+        } elseif ($salida->estado === 'confirmado') {
+            // ✅ Caso 2: Salida confirmada → devolver stock
+            foreach ($salida->detalles as $detalle) {
+                InventarioService::entradaNormal(
+                    $salida->sucursal_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'ANULACION_SALIDA',
+                    $salida->id,
+                    auth()->id()
+                );
+            }
+
+            $salida->update([
+                'estado' => 'anulado',
+                'motivo_anulacion' => $request->motivo_anulacion ?? 'Anulación de salida confirmada',
+            ]);
+        } else {
+            return redirect()->route('salidas.index')
+                ->with('error', 'Solo se pueden anular salidas pendientes o confirmadas.');
+        }
+
+        DB::commit();
+        return redirect()->route('salidas.index')->with('success', 'Salida anulada correctamente.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return redirect()->route('salidas.index')->with('error', 'Error al anular salida: ' . $e->getMessage());
+    }
+}
+
 
     public function generarPdf($id)
     {
         $salida = Salida::with(['sucursal', 'detalles.producto'])->findOrFail($id);
         $pdf = Pdf::loadView('salidas.pdf', compact('salida'))->setPaper('A4', 'portrait');
         return $pdf->stream('Salida_' . $salida->id . '.pdf');
-    }
-
-    public function reversar($id)
-    {
-        $salidaOriginal = Salida::with('detalles.producto')->findOrFail($id);
-
-        $existeReversa = Salida::where('observacion', 'like', 'Reversión de salida #%')
-            ->where('observacion', 'like', '%'.$salidaOriginal->id.'%')
-            ->exists();
-        if ($existeReversa) {
-            return redirect()->route('salidas.index')->with('error', 'Esta salida ya fue reversada.');
-        }
-
-        $diasTranscurridos = \Carbon\Carbon::parse($salidaOriginal->fecha)->diffInDays(now());
-        if ($diasTranscurridos > 7) {
-            return redirect()->route('salidas.index')->with('error', 'Solo puedes reversar salidas dentro de los 7 días posteriores a su registro.');
-        }
-
-        DB::transaction(function () use ($salidaOriginal) {
-            $salidaReversa = Salida::create([
-                'fecha' => now()->format('Y-m-d'),
-                'sucursal_id' => $salidaOriginal->sucursal_id,
-                'tipo' => $salidaOriginal->tipo,
-                'motivo' => $salidaOriginal->motivo,
-                'observacion' => 'Reversión de salida #' . $salidaOriginal->id,
-            ]);
-
-            foreach ($salidaOriginal->detalles as $detalle) {
-                DetalleSalida::create([
-                    'salida_id' => $salidaReversa->id,
-                    'producto_id' => $detalle->producto_id,
-                    'cantidad' => $detalle->cantidad
-                ]);
-
-                InventarioService::entradaNormal(
-                    $salidaOriginal->sucursal_id,
-                    $detalle->producto_id,
-                    $detalle->cantidad,
-                    0,
-                    'Reversión Salida',
-                    $salidaReversa->id,
-                    auth()->id()
-                );
-            }
-        });
-
-        return redirect()->route('salidas.index')->with('success', 'Salida reversada correctamente.');
     }
 }

@@ -8,12 +8,21 @@
         <h4 class="mb-0 d-flex align-items-center gap-2">
             <i class="bi bi-arrow-left-right text-success"></i>
             <span class="fw-semibold">Revisión del Traspaso #{{ $traspaso->id }}</span>
+
             @if ($traspaso->estado == 'pendiente')
-                <span class="badge bg-warning text-dark">Pendiente</span>
-            @elseif ($traspaso->estado == 'confirmado')
-                <span class="badge bg-success">Confirmado</span>
-            @else
-                <span class="badge bg-danger">Rechazado</span>
+                <span class="badge bg-warning text-dark">Pendiente (esperando envío)</span>
+            @elseif ($traspaso->estado == 'confirmado_origen')
+                <span class="badge bg-info text-dark">En tránsito</span>
+            @elseif ($traspaso->estado == 'confirmado_destino')
+                <span class="badge bg-success">Recibido</span>
+            @elseif ($traspaso->estado == 'rechazado')
+                <span class="badge bg-danger">Rechazado en destino</span>
+            @elseif ($traspaso->estado == 'anulado')
+                @if ($traspaso->fecha_confirmacion == null)
+                    <span class="badge bg-secondary">Cancelado en origen</span>
+                @else
+                    <span class="badge bg-secondary">Anulado en tránsito</span>
+                @endif
             @endif
         </h4>
 
@@ -97,27 +106,36 @@
 
         <div class="d-flex align-items-center gap-2">
             @if($traspaso->estado == 'pendiente')
-                {{-- Formularios ocultos --}}
-                <form id="form-confirmar" method="POST" action="{{ route('traspasos.confirmar', $traspaso->id) }}">
+                {{-- Origen: confirmar envío o cancelar --}}
+                <form id="form-origen" method="POST" action="{{ route('traspasos.confirmarOrigen', $traspaso->id) }}">
                     @csrf
-                    @method('PATCH')
+                </form>
+                <form id="form-anular" method="POST" action="{{ route('traspasos.anular', $traspaso->id) }}">
+                    @csrf
+                </form>
+                <button type="button" class="btn btn-success" onclick="confirmarOrigen()">
+                    <i class="bi bi-check2-circle me-1"></i> Confirmar envío
+                </button>
+                <button type="button" class="btn btn-danger" onclick="anularTraspaso()">
+                    <i class="bi bi-x-circle me-1"></i> Cancelar en origen
+                </button>
+            @elseif($traspaso->estado == 'confirmado_origen')
+                {{-- Destino: confirmar recepción o rechazar --}}
+                <form id="form-destino" method="POST" action="{{ route('traspasos.confirmarDestino', $traspaso->id) }}">
+                    @csrf
                 </form>
                 <form id="form-rechazar" method="POST" action="{{ route('traspasos.rechazar', $traspaso->id) }}">
                     @csrf
-                    @method('PATCH')
                 </form>
-
-                <button type="button" class="btn btn-success" onclick="confirmarTraspaso()">
+                <button type="button" class="btn btn-success" onclick="confirmarDestino()">
                     <i class="bi bi-check2-circle me-1"></i> Confirmar recepción
                 </button>
                 <button type="button" class="btn btn-danger" onclick="rechazarTraspaso()">
-                    <i class="bi bi-x-circle me-1"></i> Rechazar
+                    <i class="bi bi-x-circle me-1"></i> Rechazar en destino
                 </button>
             @endif
 
-            <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary">
-                Volver
-            </a>
+            <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary">Volver</a>
         </div>
     </div>
 </div>
@@ -126,23 +144,49 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function confirmarTraspaso() {
+function confirmarOrigen() {
     Swal.fire({
-        title: '¿Confirmar recepción?',
-        text: 'Esto actualizará el stock de la sucursal destino.',
-        icon: 'question',
+        title: '¿Confirmar envío desde ORIGEN?',
+        text: 'Esto descontará stock de la sucursal de origen.',
+        icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sí, confirmar',
         cancelButtonText: 'Cancelar'
     }).then((result) => {
-        if (result.isConfirmed) document.getElementById('form-confirmar').submit();
+        if (result.isConfirmed) document.getElementById('form-origen').submit();
+    });
+}
+
+function confirmarDestino() {
+    Swal.fire({
+        title: '¿Confirmar recepción en DESTINO?',
+        text: 'Esto sumará stock en la sucursal de destino.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, confirmar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) document.getElementById('form-destino').submit();
+    });
+}
+
+function anularTraspaso() {
+    Swal.fire({
+        title: '¿Cancelar este traspaso en ORIGEN?',
+        text: 'Esto eliminará el movimiento antes de enviarlo.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, cancelar',
+        cancelButtonText: 'Volver'
+    }).then((result) => {
+        if (result.isConfirmed) document.getElementById('form-anular').submit();
     });
 }
 
 function rechazarTraspaso() {
     Swal.fire({
-        title: '¿Rechazar traspaso?',
-        text: 'Esto revertirá el stock al origen (no moverá inventario si ya fue confirmado).',
+        title: '¿Rechazar recepción en DESTINO?',
+        text: 'Esto devolverá el stock a la sucursal de origen.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sí, rechazar',

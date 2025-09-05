@@ -21,11 +21,21 @@
                 <h5 class="mb-0">
                     <i class="bi bi-box-seam text-primary"></i> Entrada #{{ $entrada->id }}
                 </h5>
-                <small class="text-muted">
-                    <strong>Sucursal:</strong> {{ $entrada->sucursal->nombre }} |
-                    <strong>Fecha:</strong> {{ \Carbon\Carbon::parse($entrada->fecha)->format('d/m/Y') }} |
-                    <strong>Tipo:</strong> {{ $entrada->tipo ?? 'No especificado' }}
-                </small>
+                <div>
+                    {{-- Badge de estado --}}
+                    <span class="badge 
+                        @if($entrada->estado === 'pendiente') bg-warning text-dark
+                        @elseif($entrada->estado === 'confirmado') bg-success
+                        @elseif($entrada->estado === 'anulado') bg-danger
+                        @endif">
+                        {{ ucfirst($entrada->estado) }}
+                    </span>
+                    <small class="text-muted ms-2">
+                        <strong>Sucursal:</strong> {{ $entrada->sucursal->nombre }} |
+                        <strong>Fecha:</strong> {{ \Carbon\Carbon::parse($entrada->fecha)->format('d/m/Y') }} |
+                        <strong>Tipo:</strong> {{ $entrada->tipo ?? 'No especificado' }}
+                    </small>
+                </div>
             </div>
 
             <div class="card-body">
@@ -57,31 +67,59 @@
 
                 {{-- Botones de acción --}}
                 <div class="mt-3 d-flex flex-wrap gap-2">
-                    {{-- Editar --}}
-                    @if (\Carbon\Carbon::parse($entrada->fecha)->isToday() && !in_array($entrada->id, $idsReversadas) && !Str::startsWith($entrada->observacion, 'Reversión de entrada'))
+                    {{-- Editar + Confirmar solo si está pendiente --}}
+                    @if($entrada->estado === 'pendiente')
                         <a href="{{ route('entradas.edit', $entrada->id) }}" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-pencil-square"></i> Editar
                         </a>
-                    @endif
 
-                    {{-- PDF --}}
-                    <a href="{{ route('entradas.pdf', $entrada->id) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
-                        <i class="bi bi-file-earmark-pdf"></i> Ver PDF
-                    </a>
-
-                    {{-- Reversar --}}
-                    @if (!in_array($entrada->id, $idsReversadas) && !Str::startsWith($entrada->observacion, 'Reversión de entrada'))
-                        <form action="{{ route('entradas.reversar', $entrada->id) }}" method="POST" onsubmit="return confirm('¿Deseas reversar esta entrada? Esta acción no puede deshacerse.')" class="d-inline">
+                        <form action="{{ route('entradas.confirmar', $entrada->id) }}" method="POST" class="d-inline">
                             @csrf
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                <i class="bi bi-arrow-counterclockwise"></i> Reversar
+                            <button type="submit" class="btn btn-outline-success btn-sm"
+                                onclick="return confirm('¿Confirmar esta entrada? Se actualizará el stock.')">
+                                <i class="bi bi-check2-circle"></i> Confirmar
                             </button>
                         </form>
                     @endif
+
+                    {{-- Anular solo si está confirmado --}}
+                    @if($entrada->estado === 'confirmado')
+                        <form action="{{ route('entradas.anular', $entrada->id) }}" method="POST" 
+                              onsubmit="return confirmMotivo(this)" class="d-inline">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-x-circle"></i> Anular
+                            </button>
+                        </form>
+                    @endif
+
+                    {{-- PDF siempre disponible --}}
+                    <a href="{{ route('entradas.pdf', $entrada->id) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+                        <i class="bi bi-file-earmark-pdf"></i> Ver PDF
+                    </a>
                 </div>
             </div>
         </div>
     @endforeach
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function confirmMotivo(form) {
+    let motivo = prompt("Ingrese el motivo de anulación:");
+    if (!motivo) {
+        alert("Debe ingresar un motivo para anular.");
+        return false; // bloquea el submit si no hay motivo
+    }
+    let input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "motivo";
+    input.value = motivo;
+    form.appendChild(input);
+    return true;
+}
+</script>
+@endpush
+
 

@@ -47,16 +47,21 @@
                         <td>{{ \Carbon\Carbon::parse($t->fecha)->format('d/m/Y') }}</td>
                         <td>{{ $t->observacion ?? '-' }}</td>
                         <td>
+                            {{-- Revisar siempre disponible --}}
                             <a href="{{ route('traspasos.revisar', $t->id) }}" class="btn btn-sm btn-primary">
                                 🔍 Revisar
                             </a>
-                            <a href="{{ route('traspasos.confirmar', $t->id) }}" class="btn btn-sm btn-success"
-                               onclick="return confirm('¿Confirmar este traspaso?')">
-                                ✅ Confirmar
+
+                            {{-- Confirmar envío (origen) --}}
+                            <a href="{{ route('traspasos.confirmarOrigen', $t->id) }}" class="btn btn-sm btn-success"
+                               onclick="return confirm('¿Confirmar envío desde ORIGEN? Esto descontará stock en la sucursal de origen.')">
+                                ✅ Confirmar envío
                             </a>
-                            <a href="{{ route('traspasos.rechazar', $t->id) }}" class="btn btn-sm btn-danger"
-                               onclick="return confirm('¿Rechazar este traspaso y devolver el stock al origen?')">
-                                ❌ Rechazar
+
+                            {{-- Cancelar en origen --}}
+                            <a href="{{ route('traspasos.anular', $t->id) }}" class="btn btn-sm btn-danger"
+                               onclick="return confirm('¿Cancelar este traspaso en ORIGEN? Se eliminará antes de enviarlo.')">
+                                ❌ Cancelar en origen
                             </a>
                         </td>
                     </tr>
