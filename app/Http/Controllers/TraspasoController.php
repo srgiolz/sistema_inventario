@@ -14,32 +14,31 @@ use App\Services\InventarioService;
 class TraspasoController extends Controller
 {
     // 📋 Listado principal
-    public function index()
-    {
-        $traspasos = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])
-            ->latest()
-            ->get();
+// 📋 Listado principal
+public function index(Request $request)
+{
+    $query = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])
+        ->latest();
 
-        $pendientesCount = Traspaso::where('estado', 'pendiente')->count();
-
-        return view('traspasos.index', compact('traspasos', 'pendientesCount'));
+    // ✅ Filtrar solo si estado viene con valor (no vacío)
+    if ($request->filled('estado')) {
+        $query->where('estado', $request->estado);
     }
 
-    // 🆕 Formulario de creación
-    public function create(Request $request)
-    {
-        $productoNombre   = $request->input('producto');
-        $origenNombre     = $request->input('origen');
-        $destinoNombre    = $request->input('destino');
-        $cantidadSugerida = $request->input('cantidad');
+    $traspasos = $query->get();
 
+    // Contador de pendientes (para el badge en el select)
+    $pendientesCount = Traspaso::where('estado', 'pendiente')->count();
+
+    return view('traspasos.index', compact('traspasos', 'pendientesCount'));
+}
+    // 🆕 Formulario de creación
+    public function create()
+    {
         $productos  = Producto::all();
         $sucursales = Sucursal::all();
 
-        return view('traspasos.create', compact(
-            'productos', 'sucursales',
-            'productoNombre', 'origenNombre', 'destinoNombre', 'cantidadSugerida'
-        ));
+        return view('traspasos.create', compact('productos', 'sucursales'));
     }
 
     // 💾 Guardar traspaso
@@ -53,19 +52,7 @@ class TraspasoController extends Controller
             'productos'   => 'required|array|min:1',
             'productos.*.producto_id' => 'required|exists:productos,id',
             'productos.*.cantidad'    => 'required|integer|min:1',
-        ], [
-            'de_sucursal.different' => 'La sucursal de origen y la de destino deben ser diferentes.',
-            'productos.required'    => 'Debes agregar al menos un producto al traspaso.',
-            'productos.*.cantidad.min' => 'La cantidad debe ser mayor a 0.',
         ]);
-
-        // 🚫 Evitar productos duplicados
-        $idsProductos = array_column($request->productos, 'producto_id');
-        if (count($idsProductos) !== count(array_unique($idsProductos))) {
-            return back()
-                ->withErrors(['error' => '❌ No puedes agregar el mismo producto más de una vez en el traspaso.'])
-                ->withInput();
-        }
 
         DB::transaction(function () use ($request) {
             $tipo = ($request->de_sucursal == 99) ? 'abastecimiento' : 'sucursal';
@@ -88,27 +75,21 @@ class TraspasoController extends Controller
             }
         });
 
-        return redirect()->route('traspasos.index')->with('success', '✅ Traspaso registrado correctamente (pendiente de confirmación).');
-    }
-
-    // 👀 Mostrar un traspaso simple
-    public function show($id)
-    {
-        $traspaso = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])->findOrFail($id);
-        return view('traspasos.show', compact('traspaso'));
-    }
+        return redirect()->route('traspasos.index')->with('success', '✅ Traspaso registrado (pendiente de envío).');
+    }   
 
     // ✏️ Editar
     public function edit($id)
     {
         $traspaso = Traspaso::with('detalles.producto')->findOrFail($id);
+
+        if ($traspaso->estado !== 'pendiente') {
+            return redirect()->route('traspasos.index')->with('error', 'Solo se pueden editar traspasos en estado pendiente.');
+        }
+
         $sucursales = Sucursal::all();
 
-        $stocks = DB::table('inventarios')
-            ->where('sucursal_id', $traspaso->sucursal_origen_id)
-            ->pluck('cantidad', 'producto_id');
-
-        return view('traspasos.edit', compact('traspaso', 'sucursales', 'stocks'));
+        return view('traspasos.edit', compact('traspaso', 'sucursales'));
     }
 
     // 🔄 Actualizar
@@ -117,8 +98,7 @@ class TraspasoController extends Controller
         $traspaso = Traspaso::with('detalles')->findOrFail($id);
 
         if ($traspaso->estado !== 'pendiente') {
-            return redirect()->route('traspasos.index')
-                ->with('error', 'Solo se pueden editar traspasos en estado pendiente.');
+            return redirect()->route('traspasos.index')->with('error', 'Solo se pueden editar traspasos en estado pendiente.');
         }
 
         $request->validate([
@@ -128,74 +108,177 @@ class TraspasoController extends Controller
             'productos.*.cantidad'    => 'required|integer|min:1',
         ]);
 
-        $idsProductos = array_column($request->productos, 'producto_id');
-        if (count($idsProductos) !== count(array_unique($idsProductos))) {
-            return back()->withErrors(['error' => '❌ No puedes repetir el mismo producto.'])->withInput();
-        }
-
         DB::transaction(function () use ($request, $traspaso) {
-            $origenId = $traspaso->detalles()->count() > 0
-                ? $traspaso->sucursal_origen_id
-                : $request->de_sucursal;
-
             $traspaso->update([
-                'sucursal_origen_id'  => $origenId,
                 'sucursal_destino_id' => $request->a_sucursal,
                 'observacion'         => $request->observacion,
             ]);
 
-            $detallesExistentes = $traspaso->detalles->keyBy('producto_id');
-            $productosEnviados = collect($request->productos)->keyBy('producto_id');
-
-            foreach ($productosEnviados as $prodId => $data) {
-                if ($detallesExistentes->has($prodId)) {
-                    $detallesExistentes[$prodId]->update(['cantidad' => $data['cantidad']]);
-                } else {
-                    $traspaso->detalles()->create([
-                        'producto_id' => $prodId,
-                        'cantidad'    => $data['cantidad'],
-                    ]);
-                }
-            }
-
-            $idsEnviados = $productosEnviados->keys();
-            foreach ($detallesExistentes as $prodId => $detalle) {
-                if (!$idsEnviados->contains($prodId)) {
-                    $detalle->delete();
-                }
+            $traspaso->detalles()->delete();
+            foreach ($request->productos as $item) {
+                $traspaso->detalles()->create([
+                    'producto_id' => $item['producto_id'],
+                    'cantidad'    => $item['cantidad'],
+                ]);
             }
         });
 
-        return redirect()->route('traspasos.index')->with('success', '✅ El traspaso fue actualizado correctamente.');
+        return redirect()->route('traspasos.index')->with('success', '✅ El traspaso fue actualizado.');
     }
 
-    // 🗑️ (opcional) Eliminar — si no lo usas, lo dejamos vacío
+    // 🗑️ No se permite eliminar
     public function destroy($id)
     {
         return redirect()->route('traspasos.index')->with('error', '❌ La eliminación directa no está permitida.');
     }
 
-    // 📌 Pendientes
-    public function pendientes()
+    // ✅ Confirmar en ORIGEN
+    public function confirmarOrigen(Traspaso $traspaso)
     {
-        $traspasos = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])
-            ->where('estado', 'pendiente')
-            ->latest()
-            ->get();
+        if ($traspaso->estado !== 'pendiente') {
+            return back()->with('error', '⚠️ Solo se pueden confirmar traspasos pendientes en el origen.');
+        }
 
-        return view('traspasos.pendientes', compact('traspasos'));
+        DB::transaction(function () use ($traspaso) {
+            foreach ($traspaso->detalles as $detalle) {
+                $ok = InventarioService::salidaNormal(
+                    $traspaso->sucursal_origen_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'TRASPASO_OUT',
+                    $traspaso->id,
+                    auth()->id()
+                );
+                if (!$ok) {
+                    throw new \Exception("Stock insuficiente en origen para el producto ID {$detalle->producto_id}");
+                }
+            }
+
+            $traspaso->update([
+                'estado' => 'confirmado_origen',
+                'fecha_confirmacion' => now(),
+                'usuario_confirma_id' => auth()->id(),
+            ]);
+        });
+
+        return back()->with('success', '✅ Traspaso confirmado en ORIGEN.');
     }
 
-    // 🔍 Revisar
-    public function revisar($id)
+    // ✅ Confirmar en DESTINO
+    public function confirmarDestino(Traspaso $traspaso)
+    {
+        if ($traspaso->estado !== 'confirmado_origen') {
+            return back()->with('error', '⚠️ Solo se pueden confirmar en destino los traspasos enviados desde origen.');
+        }
+
+        DB::transaction(function () use ($traspaso) {
+            foreach ($traspaso->detalles as $detalle) {
+                InventarioService::entradaNormal(
+                    $traspaso->sucursal_destino_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'TRASPASO_IN',
+                    $traspaso->id,
+                    auth()->id()
+                );
+            }
+
+            $traspaso->update([
+                'estado' => 'confirmado_destino',
+                'fecha_recepcion' => now(),
+                'usuario_recepciona_id' => auth()->id(),
+            ]);
+        });
+
+        return back()->with('success', '✅ Traspaso confirmado en DESTINO.');
+    }
+
+    // ❌ Rechazar
+    public function rechazar(Request $request, Traspaso $traspaso)
+    {
+        if ($traspaso->estado === 'pendiente') {
+            // Cancelación antes de enviar
+            $traspaso->update([
+                'estado' => 'rechazado',
+                'motivo_anulacion' => $request->motivo ?? 'Cancelado en origen',
+            ]);
+        } elseif ($traspaso->estado === 'confirmado_origen') {
+            // Rechazo en destino → revertir salida en origen
+            DB::transaction(function () use ($traspaso, $request) {
+                foreach ($traspaso->detalles as $detalle) {
+                    InventarioService::anulacion(
+                        $traspaso->sucursal_origen_id,
+                        $detalle->producto_id,
+                        $detalle->cantidad,
+                        0,
+                        'ANULACION_TRASPASO_OUT',
+                        $traspaso->id,
+                        auth()->id()
+                    );
+                }
+
+                $traspaso->update([
+                    'estado' => 'rechazado',
+                    'motivo_anulacion' => $request->motivo ?? 'Rechazado en destino',
+                ]);
+            });
+        } else {
+            return back()->with('error', '⚠️ No se puede rechazar este traspaso.');
+        }
+
+        return back()->with('success', '🚫 Traspaso rechazado correctamente.');
+    }
+
+    // ❌ Anular (opcional, admin)
+    public function anular(Request $request, Traspaso $traspaso)
+    {
+        if ($traspaso->estado !== 'confirmado_destino') {
+            return back()->with('error', '⚠️ Solo se pueden anular traspasos ya recibidos.');
+        }
+
+        DB::transaction(function () use ($traspaso, $request) {
+            foreach ($traspaso->detalles as $detalle) {
+                InventarioService::anulacion(
+                    $traspaso->sucursal_origen_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'ANULACION_TRASPASO_OUT',
+                    $traspaso->id,
+                    auth()->id()
+                );
+                InventarioService::anulacion(
+                    $traspaso->sucursal_destino_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'ANULACION_TRASPASO_IN',
+                    $traspaso->id,
+                    auth()->id()
+                );
+            }
+
+            $traspaso->update([
+                'estado' => 'anulado',
+                'motivo_anulacion' => $request->motivo ?? 'Anulado manualmente',
+            ]);
+        });
+
+        return back()->with('success', '❌ Traspaso anulado correctamente.');
+    }
+
+    // 📄 Generar PDF
+    public function generarPDF($id)
     {
         $traspaso = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])
             ->findOrFail($id);
 
-        return view('traspasos.revisar', compact('traspaso'));
+        $pdf = Pdf::loadView('traspasos.pdf', compact('traspaso'));
+        return $pdf->stream("traspaso_{$traspaso->id}.pdf");
     }
-
-    // 📦 Productos disponibles por sucursal (API Select2)
+    // 📦 API: productos disponibles por sucursal
     public function productosPorSucursal($idSucursal, Request $request)
     {
         $term = $request->get('term', '');
@@ -216,9 +299,8 @@ class TraspasoController extends Controller
 
         return response()->json($productos);
     }
-
-    // 📊 Stock individual (para Ajax)
-    public function obtenerStock($idProducto, $idSucursal)
+// 📦 API: obtener stock disponible de un producto en una sucursal
+public function obtenerStock($idProducto, $idSucursal)
     {
         $stock = DB::table('inventarios')
             ->where('producto_id', $idProducto)
@@ -227,27 +309,13 @@ class TraspasoController extends Controller
 
         return response()->json(['stock' => $stock ?? 0]);
     }
-
-    // ✅ Confirmar en ORIGEN
-    public function confirmarOrigen(Traspaso $traspaso) { /* ...como ya lo tienes... */ }
-
-    // ✅ Confirmar en DESTINO
-    public function confirmarDestino(Traspaso $traspaso) { /* ...como ya lo tienes... */ }
-
-    // ❌ Anular
-    public function anular(Request $request, Traspaso $traspaso) { /* ...como ya lo tienes... */ }
-
-    // ❌ Rechazar
-    public function rechazar(Request $request, Traspaso $traspaso) { /* ...como ya lo tienes... */ }
-
-    // 📄 Generar PDF
-    public function generarPDF($id)
+        // 🔍 Revisar
+    public function revisar($id)
     {
         $traspaso = Traspaso::with(['sucursalOrigen', 'sucursalDestino', 'detalles.producto'])
             ->findOrFail($id);
 
-        $pdf = Pdf::loadView('traspasos.pdf', compact('traspaso'));
-        return $pdf->stream("traspaso_{$traspaso->id}.pdf");
+        return view('traspasos.revisar', compact('traspaso'));
     }
 }
 
