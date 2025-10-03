@@ -195,42 +195,41 @@ public function index(Request $request)
         return back()->with('success', '✅ Traspaso confirmado en DESTINO.');
     }
 
-    // ❌ Rechazar
-    public function rechazar(Request $request, Traspaso $traspaso)
-    {
-        if ($traspaso->estado === 'pendiente') {
-            // Cancelación antes de enviar
+// ❌ Rechazar
+public function rechazar(Request $request, Traspaso $traspaso)
+{
+    if ($traspaso->estado === 'pendiente') {
+        // Cancelación antes de enviarlo
+        $traspaso->update([
+            'estado' => 'rechazado',
+            'motivo_anulacion' => $request->motivo ?? 'Cancelado en origen',
+        ]);
+    } elseif ($traspaso->estado === 'confirmado_origen') {
+        // Rechazo en destino → devolver stock al ORIGEN
+        DB::transaction(function () use ($traspaso, $request) {
+            foreach ($traspaso->detalles as $detalle) {
+                InventarioService::entradaNormal(
+                    $traspaso->sucursal_origen_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'TRASPASO_RECHAZADO',
+                    $traspaso->id,
+                    auth()->id()
+                );
+            }
+
             $traspaso->update([
                 'estado' => 'rechazado',
-                'motivo_anulacion' => $request->motivo ?? 'Cancelado en origen',
+                'motivo_anulacion' => $request->motivo ?? 'Rechazado en destino',
             ]);
-        } elseif ($traspaso->estado === 'confirmado_origen') {
-            // Rechazo en destino → revertir salida en origen
-            DB::transaction(function () use ($traspaso, $request) {
-                foreach ($traspaso->detalles as $detalle) {
-                    InventarioService::anulacion(
-                        $traspaso->sucursal_origen_id,
-                        $detalle->producto_id,
-                        $detalle->cantidad,
-                        0,
-                        'ANULACION_TRASPASO_OUT',
-                        $traspaso->id,
-                        auth()->id()
-                    );
-                }
-
-                $traspaso->update([
-                    'estado' => 'rechazado',
-                    'motivo_anulacion' => $request->motivo ?? 'Rechazado en destino',
-                ]);
-            });
-        } else {
-            return back()->with('error', '⚠️ No se puede rechazar este traspaso.');
-        }
-
-        return back()->with('success', '🚫 Traspaso rechazado correctamente.');
+        });
+    } else {
+        return back()->with('error', '⚠️ No se puede rechazar este traspaso.');
     }
 
+    return back()->with('success', '🚫 Traspaso rechazado correctamente.');
+}
     // ❌ Anular (opcional, admin)
     public function anular(Request $request, Traspaso $traspaso)
     {

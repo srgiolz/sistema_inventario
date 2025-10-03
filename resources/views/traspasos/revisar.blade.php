@@ -87,26 +87,29 @@
                     ✏️ Editar traspaso
                 </a>
                 {{-- Confirmar envío --}}
-                <form method="POST" action="{{ route('traspasos.confirmarOrigen', $traspaso->id) }}">
+                <form id="form-origen" method="POST" action="{{ route('traspasos.confirmarOrigen', $traspaso->id) }}">
                     @csrf
-                    <button type="submit" class="btn btn-success">✔️ Confirmar envío</button>
                 </form>
+                <button type="button" class="btn btn-success" onclick="confirmarOrigen()">✔️ Confirmar envío</button>
                 {{-- Cancelar --}}
-                <form method="POST" action="{{ route('traspasos.anular', $traspaso->id) }}">
+                <form id="form-anular" method="POST" action="{{ route('traspasos.anular', $traspaso->id) }}">
                     @csrf
-                    <button type="submit" class="btn btn-danger">❌ Cancelar en origen</button>
                 </form>
+                <button type="button" class="btn btn-danger" onclick="anularTraspaso()">❌ Cancelar en origen</button>
+
             @elseif ($traspaso->estado === 'confirmado_origen')
                 {{-- Confirmar en destino --}}
-                <form method="POST" action="{{ route('traspasos.confirmarDestino', $traspaso->id) }}">
+                <form id="form-destino" method="POST" action="{{ route('traspasos.confirmarDestino', $traspaso->id) }}">
                     @csrf
-                    <button type="submit" class="btn btn-success">✔️ Confirmar recepción</button>
                 </form>
+                <button type="button" class="btn btn-success" onclick="confirmarDestino()">✔️ Confirmar recepción</button>
+
                 {{-- Rechazar --}}
-                <form method="POST" action="{{ route('traspasos.rechazar', $traspaso->id) }}">
+                <form id="form-rechazar" method="POST" action="{{ route('traspasos.rechazar', $traspaso->id) }}">
                     @csrf
-                    <button type="submit" class="btn btn-danger">❌ Rechazar en destino</button>
+                    <input type="hidden" name="motivo" id="motivo_rechazo">
                 </form>
+                <button type="button" class="btn btn-danger" onclick="rechazarTraspaso()">❌ Rechazar en destino</button>
             @endif
 
             <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary">Volver</a>
@@ -114,3 +117,64 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+function confirmarOrigen() {
+    Swal.fire({
+        title: '¿Confirmar envío desde ORIGEN?',
+        text: 'Esto descontará stock de la sucursal de origen.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, confirmar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) document.getElementById('form-origen').submit();
+    });
+}
+
+function confirmarDestino() {
+    Swal.fire({
+        title: '¿Confirmar recepción en DESTINO?',
+        text: 'Esto sumará stock en la sucursal de destino.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, confirmar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) document.getElementById('form-destino').submit();
+    });
+}
+
+function anularTraspaso() {
+    Swal.fire({
+        title: '¿Cancelar este traspaso en ORIGEN?',
+        text: 'Esto eliminará el movimiento antes de enviarlo.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, cancelar',
+        cancelButtonText: 'Volver'
+    }).then((result) => {
+        if (result.isConfirmed) document.getElementById('form-anular').submit();
+    });
+}
+
+function rechazarTraspaso() {
+    Swal.fire({
+        title: 'Rechazar traspaso',
+        input: 'textarea',
+        inputLabel: 'Indica el motivo del rechazo',
+        inputPlaceholder: 'Escribe aquí...',
+        showCancelButton: true,
+        confirmButtonText: 'Rechazar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('motivo_rechazo').value = result.value || 'Rechazado en destino';
+            document.getElementById('form-rechazar').submit();
+        }
+    });
+}
+</script>
+@endpush
