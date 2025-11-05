@@ -205,6 +205,11 @@ public function anular(Request $request, $id)
         return redirect()->route('salidas.index')->with('error', 'Error al anular salida: ' . $e->getMessage());
     }
 }
+public function revisar($id)
+{
+    $salida = \App\Models\Salida::with(['sucursal', 'detalles.producto'])->findOrFail($id);
+    return view('salidas.revisar', compact('salida'));
+}
 
 
     public function generarPdf($id)

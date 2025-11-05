@@ -9,17 +9,19 @@
             <i class="bi bi-arrow-left-right text-success"></i>
             <span class="fw-semibold">Revisión del Traspaso #{{ $traspaso->id }}</span>
 
-            @if ($traspaso->estado == 'pendiente')
-                <span class="badge bg-warning text-dark">Pendiente (esperando envío)</span>
-            @elseif ($traspaso->estado == 'confirmado_origen')
-                <span class="badge bg-info text-dark">En tránsito</span>
-            @elseif ($traspaso->estado == 'confirmado_destino')
-                <span class="badge bg-success">Recibido</span>
-            @elseif ($traspaso->estado == 'rechazado')
-                <span class="badge bg-danger">Rechazado en destino</span>
-            @elseif ($traspaso->estado == 'anulado')
-                <span class="badge bg-secondary">Anulado</span>
-            @endif
+            @php
+                $estado = [
+                    'pendiente' => ['text' => 'Pendiente (esperando envío)', 'class' => 'bg-warning text-dark'],
+                    'confirmado_origen' => ['text' => 'En tránsito', 'class' => 'bg-info text-dark'],
+                    'confirmado_destino' => ['text' => 'Recibido', 'class' => 'bg-success'],
+                    'rechazado' => ['text' => 'Rechazado', 'class' => 'bg-danger'],
+                    'anulado' => ['text' => 'Anulado', 'class' => 'bg-secondary']
+                ];
+            @endphp
+
+            <span class="badge {{ $estado[$traspaso->estado]['class'] }} px-3 py-2">
+                {{ $estado[$traspaso->estado]['text'] }}
+            </span>
         </h4>
 
         <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary btn-sm px-3">
@@ -30,7 +32,7 @@
     {{-- Resumen --}}
     <div class="row g-3 mb-3">
         <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 hover-shadow">
                 <div class="card-body">
                     <h6 class="fw-semibold text-muted mb-3">Sucursales</h6>
                     <p><span class="text-muted">Origen:</span> <span class="fw-semibold">{{ $traspaso->sucursalOrigen->nombre }}</span></p>
@@ -39,7 +41,7 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 hover-shadow">
                 <div class="card-body">
                     <h6 class="fw-semibold text-muted mb-3">Detalle</h6>
                     <p><span class="text-muted">Fecha:</span> <span class="fw-semibold">{{ \Carbon\Carbon::parse($traspaso->fecha)->format('d/m/Y') }}</span></p>
@@ -75,106 +77,133 @@
     </div>
 
     {{-- Acciones --}}
-    <div class="d-flex justify-content-between align-items-center mt-4">
-        <a href="{{ route('traspasos.pdf', $traspaso->id) }}" target="_blank" class="btn btn-outline-secondary">
+    <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-2">
+        <a href="{{ route('traspasos.pdf', $traspaso->id) }}" target="_blank" class="btn btn-outline-dark">
             <i class="bi bi-printer me-1"></i> Imprimir Guía (PDF)
         </a>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
             @if ($traspaso->estado === 'pendiente')
-                {{-- Editar --}}
                 <a href="{{ route('traspasos.edit', $traspaso->id) }}" class="btn btn-warning">
-                    ✏️ Editar traspaso
+                    <i class="bi bi-pencil-square me-1"></i> Editar
                 </a>
-                {{-- Confirmar envío --}}
-                <form id="form-origen" method="POST" action="{{ route('traspasos.confirmarOrigen', $traspaso->id) }}">
-                    @csrf
+                <form id="form-origen" method="POST" action="{{ route('traspasos.confirmarOrigen', $traspaso->id) }}">@csrf</form>
+                <button type="button" class="btn btn-success" onclick="accionTraspaso('origen')">
+                    <i class="bi bi-send-check me-1"></i> Confirmar envío
+                </button>
+                <form id="form-rechazar-origen" method="POST" action="{{ route('traspasos.rechazar', $traspaso->id) }}">@csrf
+                    <input type="hidden" name="motivo" id="motivo_rechazo_origen">
                 </form>
-                <button type="button" class="btn btn-success" onclick="confirmarOrigen()">✔️ Confirmar envío</button>
-                {{-- Cancelar --}}
-                <form id="form-anular" method="POST" action="{{ route('traspasos.anular', $traspaso->id) }}">
-                    @csrf
-                </form>
-                <button type="button" class="btn btn-danger" onclick="anularTraspaso()">❌ Cancelar en origen</button>
-
+                <button type="button" class="btn btn-danger" onclick="accionTraspaso('cancelar')">
+                    <i class="bi bi-x-circle me-1"></i> Cancelar en origen
+                </button>
             @elseif ($traspaso->estado === 'confirmado_origen')
-                {{-- Confirmar en destino --}}
-                <form id="form-destino" method="POST" action="{{ route('traspasos.confirmarDestino', $traspaso->id) }}">
-                    @csrf
-                </form>
-                <button type="button" class="btn btn-success" onclick="confirmarDestino()">✔️ Confirmar recepción</button>
-
-                {{-- Rechazar --}}
-                <form id="form-rechazar" method="POST" action="{{ route('traspasos.rechazar', $traspaso->id) }}">
-                    @csrf
+                <form id="form-destino" method="POST" action="{{ route('traspasos.confirmarDestino', $traspaso->id) }}">@csrf</form>
+                <button type="button" class="btn btn-success" onclick="accionTraspaso('destino')">
+                    <i class="bi bi-check2-circle me-1"></i> Confirmar recepción
+                </button>
+                <form id="form-rechazar" method="POST" action="{{ route('traspasos.rechazar', $traspaso->id) }}">@csrf
                     <input type="hidden" name="motivo" id="motivo_rechazo">
                 </form>
-                <button type="button" class="btn btn-danger" onclick="rechazarTraspaso()">❌ Rechazar en destino</button>
+                <button type="button" class="btn btn-danger" onclick="accionTraspaso('rechazar')">
+                    <i class="bi bi-exclamation-octagon me-1"></i> Rechazar en destino
+                </button>
             @endif
-
-            <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary">Volver</a>
+            <a href="{{ route('traspasos.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Volver
+            </a>
         </div>
     </div>
 </div>
-@endsection
+
+@push('styles')
+<style>
+    .hover-shadow:hover { box-shadow: 0 0 10px rgba(0,0,0,0.1); transition: .3s; }
+</style>
+@endpush
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function confirmarOrigen() {
-    Swal.fire({
-        title: '¿Confirmar envío desde ORIGEN?',
-        text: 'Esto descontará stock de la sucursal de origen.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, confirmar',
-        cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) document.getElementById('form-origen').submit();
-    });
-}
+function accionTraspaso(tipo) {
+    let titulo, texto, icono, formId, exito;
 
-function confirmarDestino() {
-    Swal.fire({
-        title: '¿Confirmar recepción en DESTINO?',
-        text: 'Esto sumará stock en la sucursal de destino.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, confirmar',
-        cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) document.getElementById('form-destino').submit();
-    });
-}
+    switch(tipo) {
+        case 'origen':
+            titulo = '¿Confirmar envío desde origen?';
+            texto = 'Esto descontará stock de la sucursal de origen.';
+            icono = 'question';
+            formId = 'form-origen';
+            exito = 'El traspaso fue enviado correctamente desde la sucursal de origen.';
+            break;
 
-function anularTraspaso() {
-    Swal.fire({
-        title: '¿Cancelar este traspaso en ORIGEN?',
-        text: 'Esto eliminará el movimiento antes de enviarlo.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, cancelar',
-        cancelButtonText: 'Volver'
-    }).then((result) => {
-        if (result.isConfirmed) document.getElementById('form-anular').submit();
-    });
-}
+        case 'destino':
+            titulo = '¿Confirmar recepción en destino?';
+            texto = 'Esto sumará stock en la sucursal de destino.';
+            icono = 'question';
+            formId = 'form-destino';
+            exito = 'El traspaso fue recibido correctamente en la sucursal de destino.';
+            break;
 
-function rechazarTraspaso() {
+        case 'cancelar':
+            titulo = '¿Cancelar traspaso en origen?';
+            texto = 'El traspaso se marcará como cancelado sin afectar stock.';
+            icono = 'warning';
+            formId = 'form-rechazar-origen';
+            document.getElementById('motivo_rechazo_origen').value = 'Cancelado en origen';
+            exito = 'El traspaso fue cancelado antes del envío.';
+            break;
+
+        case 'rechazar':
+            Swal.fire({
+                title: 'Rechazar traspaso',
+                input: 'textarea',
+                inputLabel: 'Indica el motivo del rechazo',
+                inputPlaceholder: 'Escribe aquí...',
+                showCancelButton: true,
+                confirmButtonText: 'Rechazar',
+                cancelButtonText: 'Cancelar',
+                icon: 'warning'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('motivo_rechazo').value = result.value || 'Rechazado en destino';
+                    document.getElementById('form-rechazar').submit();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Traspaso rechazado',
+                        text: 'El traspaso fue rechazado correctamente.',
+                        showConfirmButton: false,
+                        timer: 1500,
+                        willClose: () => window.location.href = "{{ route('traspasos.index') }}"
+                    });
+                }
+            });
+            return;
+    }
+
     Swal.fire({
-        title: 'Rechazar traspaso',
-        input: 'textarea',
-        inputLabel: 'Indica el motivo del rechazo',
-        inputPlaceholder: 'Escribe aquí...',
+        title: titulo,
+        text: texto,
+        icon: icono,
         showCancelButton: true,
-        confirmButtonText: 'Rechazar',
-        cancelButtonText: 'Cancelar'
+        confirmButtonText: 'Sí, continuar',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true
     }).then((result) => {
         if (result.isConfirmed) {
-            document.getElementById('motivo_rechazo').value = result.value || 'Rechazado en destino';
-            document.getElementById('form-rechazar').submit();
+            document.getElementById(formId).submit();
+            Swal.fire({
+                icon: 'success',
+                title: 'Operación exitosa',
+                text: exito,
+                showConfirmButton: false,
+                timer: 1500,
+                timerProgressBar: true,
+                willClose: () => window.location.href = "{{ route('traspasos.index') }}"
+            });
         }
     });
 }
 </script>
 @endpush
+@endsection

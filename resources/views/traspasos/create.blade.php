@@ -107,7 +107,7 @@
     </div>
 </div>
 
-{{-- ===== Estilos puntuales (ligeros) ===== --}}
+{{-- ===== Estilos ===== --}}
 @push('styles')
 <style>
     .select2-container--default .select2-selection--single {
@@ -116,10 +116,11 @@
     .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 25px; }
     .select2-container--default .select2-selection--single .select2-selection__arrow { height: 36px; }
     #tabla-productos td .form-control.text-center { text-align: center; }
+    .table-danger { background-color: #ffeaea !important; transition: background-color 0.3s ease; }
 </style>
 @endpush
 
-{{-- ===== Dependencias y JS (tu misma lógica) ===== --}}
+{{-- ===== Scripts ===== --}}
 @push('scripts')
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -131,7 +132,14 @@ let index = 0;
 
 function crearFilaProducto() {
     const sucursalId = $('#de_sucursal').val();
-    if (!sucursalId) { alert('Selecciona primero la sucursal de origen.'); return; }
+    if (!sucursalId) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Selecciona una sucursal de origen primero',
+            confirmButtonText: 'Entendido'
+        });
+        return;
+    }
 
     const fila = `
         <tr>
@@ -185,66 +193,156 @@ function actualizarStock(selectElement) {
 $(function () {
     $('#agregar-producto').on('click', crearFilaProducto);
     $('#tabla-productos').on('click', '.eliminar', function () { $(this).closest('tr').remove(); });
+    $('#de_sucursal').on('change', function () { $('#tabla-productos tbody').empty(); index = 0; });
 
-    // ✅ Limpiar tabla si cambia sucursal de origen
-    $('#de_sucursal').on('change', function () {
-        $('#tabla-productos tbody').empty();
-        index = 0;
-    });
-
-    // ✅ Evitar productos duplicados en la tabla
     $('#tabla-productos').on('change', '.select-producto', function () {
         const seleccionado = $(this).val();
         let repetido = false;
 
         $('.select-producto').not(this).each(function () {
-            if ($(this).val() === seleccionado) {
-                repetido = true;
-            }
+            if ($(this).val() === seleccionado) repetido = true;
         });
 
         if (repetido) {
-            alert('⚠️ Ese producto ya fue agregado. Elige otro.');
-            $(this).val(null).trigger('change'); // limpia el select
+            Swal.fire({ icon: 'warning', title: 'Producto duplicado', text: 'Ese producto ya fue agregado.' });
+            $(this).val(null).trigger('change');
         } else {
-            actualizarStock($(this)); // si no es repetido, actualiza stock
+            actualizarStock($(this));
         }
     });
 
-    // Validación antes de enviar
-    $('form').on('submit', function (e) {
-        let ok = true;
-        $('#tabla-productos tbody tr').each(function () {
-            const stock = parseInt($(this).find('.stock').val()) || 0;
-            const cantidad = parseInt($(this).find('.cantidad').val()) || 0;
-            if (cantidad > stock) {
-                alert('No puedes traspasar más de lo disponible.');
-                ok = false;
-                return false;
-            }
-        });
-        if (!ok) e.preventDefault();
-    });
-});
-
-// Confirmación con SweetAlert
+// ✅ Validaciones completas antes de registrar
 $('#btnRegistrar').on('click', function (e) {
     e.preventDefault();
+
+    const sucursalOrigen = $('#de_sucursal').val();
+    const sucursalDestino = $('#a_sucursal').val();
+    const filas = $('#tabla-productos tbody tr');
+
+    // ✅ Validación 1: Sucursal de origen
+    if (!sucursalOrigen) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sucursal de origen requerida',
+            text: 'Selecciona la sucursal desde la que se enviará el traspaso.',
+        });
+        return;
+    }
+
+    // ✅ Validación 2: Sucursal de destino
+    if (!sucursalDestino) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sucursal de destino requerida',
+            text: 'Selecciona la sucursal que recibirá el traspaso.',
+        });
+        return;
+    }
+
+    // ✅ Validación 3: Evitar traspaso a la misma sucursal
+    if (sucursalOrigen === sucursalDestino) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Sucursales duplicadas',
+            text: 'La sucursal de origen y destino no pueden ser la misma.',
+        });
+        return;
+    }
+
+    // ✅ Validación 4: Al menos un producto agregado
+    if (filas.length === 0) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Sin productos',
+            text: 'Debes agregar al menos un producto para realizar el traspaso.',
+        });
+        return;
+    }
+
+    // ✅ Validación 5: Productos vacíos, cantidades vacías o mayores al stock
+    let errorProducto = false;
+    let errorCantidad = false;
+    let errorStock = false;
+
+    filas.each(function () {
+        const producto = $(this).find('.select-producto').val();
+        const stock = parseInt($(this).find('.stock').val()) || 0;
+        const cantidad = parseInt($(this).find('.cantidad').val()) || 0;
+
+        $(this).removeClass('table-danger');
+
+        if (!producto) {
+            errorProducto = true;
+            $(this).addClass('table-danger');
+        }
+
+        if (!cantidad || cantidad <= 0) {
+            errorCantidad = true;
+            $(this).addClass('table-danger');
+        }
+
+        if (cantidad > stock) {
+            errorStock = true;
+            $(this).addClass('table-danger');
+        }
+    });
+
+    if (errorProducto) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Producto sin seleccionar',
+            text: 'Verifica que todas las filas tengan un producto seleccionado.',
+        });
+        return;
+    }
+
+    if (errorCantidad) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Cantidad inválida',
+            text: 'Hay filas con cantidad vacía o menor a 1. Corrige antes de continuar.',
+        });
+        return;
+    }
+
+    if (errorStock) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Cantidad excedida',
+            text: 'Uno o más productos superan el stock disponible. Corrige las cantidades antes de continuar.',
+        });
+        return;
+    }
+
+    // ✅ Confirmación final
     Swal.fire({
         title: '¿Registrar traspaso?',
         text: 'Verifica que los productos y cantidades sean correctos.',
-        icon: 'warning',
+        icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, registrar',
         cancelButtonText: 'Cancelar',
         reverseButtons: true
     }).then((result) => {
         if (result.isConfirmed) {
-            $('form').submit(); // ✅ envía el formulario solo si confirma
+            Swal.fire({
+                icon: 'success',
+                title: 'Traspaso registrado con éxito',
+                text: 'Redirigiendo al historial...',
+                showConfirmButton: false,
+                timer: 1800,
+                timerProgressBar: true,
+                willClose: () => {
+                    $('form').submit();
+                    setTimeout(() => {
+                        window.location.href = "{{ route('traspasos.index') }}";
+                    }, 1800);
+                }
+            });
         }
     });
+});
 });
 </script>
 @endpush
 @endsection
-

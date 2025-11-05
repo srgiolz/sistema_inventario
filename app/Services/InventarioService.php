@@ -4,9 +4,17 @@ namespace App\Services;
 
 use App\Models\Inventario;
 use App\Models\Kardex;
+use Illuminate\Support\Facades\DB;
 
 class InventarioService
 {
+    // 🔹 Enumeraciones de tipo de movimiento
+    const TIPO_ENTRADA          = 'ENTRADA';
+    const TIPO_SALIDA           = 'SALIDA';
+    const TIPO_TRASPASO_IN      = 'TRASPASO_IN';
+    const TIPO_TRASPASO_OUT     = 'TRASPASO_OUT';
+    const TIPO_ANULACION        = 'ANULACION';
+
     /**
      * Suma stock (Entradas, Traspaso destino)
      */
@@ -31,14 +39,13 @@ class InventarioService
         $inventario->cantidad += $cantidad;
         $inventario->save();
 
-        // 🔹 Referencia legible
         $docRef = strtoupper($documentoTipo) . ' #' . $documentoId;
 
         self::registrarKardex(
             $sucursalId,
             $productoId,
             $cantidad,
-            'ENTRADA',
+            self::TIPO_ENTRADA,
             $inventario->cantidad,
             $precio,
             $documentoTipo,
@@ -47,7 +54,7 @@ class InventarioService
             $docRef
         );
 
-        return true;
+        return $inventario;
     }
 
     /**
@@ -64,23 +71,20 @@ class InventarioService
             ->lockForUpdate()
             ->first();
 
-        // 🚨 Validación de stock
         if (!$inventario || $inventario->cantidad < $cantidad) {
-            return false; // ahora sí se devuelve al controlador
+            return false; // stock insuficiente
         }
 
-        // ✅ Restar stock
         $inventario->cantidad -= $cantidad;
         $inventario->save();
 
-        // 🔹 Referencia legible
         $docRef = strtoupper($documentoTipo) . ' #' . $documentoId;
 
         self::registrarKardex(
             $sucursalId,
             $productoId,
             -$cantidad,
-            'SALIDA',
+            self::TIPO_SALIDA,
             $inventario->cantidad,
             $precio,
             $documentoTipo,
@@ -89,7 +93,7 @@ class InventarioService
             $docRef
         );
 
-        return true;
+        return $inventario;
     }
 
     /**
@@ -113,14 +117,13 @@ class InventarioService
         $inventario->cantidad -= $cantidad;
         $inventario->save();
 
-        // 🔹 Referencia legible para anulaciones
         $docRef = 'ANULACION ' . strtoupper($documentoTipo) . ' #' . $documentoId;
 
         self::registrarKardex(
             $sucursalId,
             $productoId,
             -$cantidad,
-            'ANULACION_' . strtoupper($documentoTipo),
+            self::TIPO_ANULACION . '_' . strtoupper($documentoTipo),
             $inventario->cantidad,
             $precio,
             $documentoTipo,
@@ -129,7 +132,7 @@ class InventarioService
             $docRef
         );
 
-        return true;
+        return $inventario;
     }
 
     /**
@@ -150,6 +153,71 @@ class InventarioService
             'fecha'           => now(),
             'doc_ref'         => $docRef ?? (strtoupper($documentoTipo) . ' #' . $documentoId),
         ]);
+    }
+
+    // ======================================================
+    // 🔹 NUEVAS FUNCIONALIDADES A PARTIR DE AQUÍ
+    // ======================================================
+
+    /**
+     * Movimiento de Traspaso: resta del origen y suma al destino
+     */
+    public static function movimientoTraspaso($traspaso, $usuarioId)
+    {
+        DB::transaction(function () use ($traspaso, $usuarioId) {
+            foreach ($traspaso->detalles as $detalle) {
+                // OUT desde sucursal origen
+                self::salidaNormal(
+                    $traspaso->sucursal_origen_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'TRASPASO',
+                    $traspaso->id,
+                    $usuarioId
+                );
+
+                // IN en sucursal destino
+                self::entradaNormal(
+                    $traspaso->sucursal_destino_id,
+                    $detalle->producto_id,
+                    $detalle->cantidad,
+                    0,
+                    'TRASPASO',
+                    $traspaso->id,
+                    $usuarioId
+                );
+            }
+        });
+    }
+
+    /**
+     * Consulta rápida de stock actual
+     */
+    public static function getStockActual($productoId, $sucursalId)
+    {
+        $inventario = Inventario::where('producto_id', $productoId)
+            ->where('sucursal_id', $sucursalId)
+            ->first();
+
+        return $inventario ? $inventario->cantidad : 0;
+    }
+
+    /**
+     * Valida si hay stock suficiente para varios productos
+     */
+    public static function bulkValidateStock($sucursalId, array $items)
+    {
+        foreach ($items as $item) {
+            $inventario = Inventario::where('producto_id', $item['producto_id'])
+                ->where('sucursal_id', $sucursalId)
+                ->first();
+
+            if (!$inventario || $inventario->cantidad < $item['cantidad']) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 

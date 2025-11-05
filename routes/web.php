@@ -40,6 +40,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/salidas/{id}/confirmar', [SalidaController::class, 'confirm'])->name('salidas.confirm');
     Route::post('/salidas/{id}/anular', [SalidaController::class, 'anular'])->name('salidas.anular');
     Route::get('/salidas/{id}/pdf', [SalidaController::class, 'generarPdf'])->name('salidas.pdf');
+    // 👁️ Revisión de una salida específica
+Route::get('/salidas/{id}/revisar', [SalidaController::class, 'revisar'])->name('salidas.revisar');
+
 
     // 📦 Traspasos
     Route::prefix('traspasos')->group(function () {

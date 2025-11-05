@@ -28,16 +28,8 @@
                         @elseif($salida->estado === 'confirmado') bg-success
                         @elseif($salida->estado === 'anulado') bg-danger
                         @endif">
-
-                        @if($salida->estado === 'anulado' && !$salida->fecha_confirmacion)
-                            Cancelado
-                        @elseif($salida->estado === 'anulado' && $salida->fecha_confirmacion)
-                            Anulado
-                        @else
-                            {{ ucfirst($salida->estado) }}
-                        @endif
+                        {{ ucfirst($salida->estado) }}
                     </span>
-
                     <small class="text-muted ms-2">
                         <strong>Sucursal:</strong> {{ $salida->sucursal->nombre }} |
                         <strong>Fecha:</strong> {{ \Carbon\Carbon::parse($salida->fecha)->format('d/m/Y') }} |
@@ -64,8 +56,7 @@
                 @if ($salida->estado === 'anulado' && $salida->motivo_anulacion)
                     <div class="p-2 mb-2 bg-light rounded border-start border-3 border-danger">
                         <i class="bi bi-x-octagon text-danger me-2"></i>
-                        <strong>Motivo {{ $salida->fecha_confirmacion ? 'de anulación' : 'de cancelación' }}:</strong> 
-                        {{ $salida->motivo_anulacion }}
+                        <strong>Motivo de anulación:</strong> {{ $salida->motivo_anulacion }}
                     </div>
                 @endif
 
@@ -80,52 +71,19 @@
                     <tbody>
                         @foreach($salida->detalles as $detalle)
                             <tr>
-                                <td>{{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}</td>
+                                <td style="white-space: normal; word-break: break-word;">
+                                    {{ $detalle->producto->codigo_item }} - {{ $detalle->producto->descripcion }}
+                                </td>
                                 <td class="text-center fw-bold">{{ $detalle->cantidad }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
 
-                {{-- Botones de acción --}}
+                {{-- Solo botón revisar --}}
                 <div class="mt-3 d-flex flex-wrap gap-2">
-                    {{-- Editar + Confirmar solo si está pendiente --}}
-                    @if($salida->estado === 'pendiente')
-                        <a href="{{ route('salidas.edit', $salida->id) }}" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-pencil-square"></i> Editar
-                        </a>
-
-                        <form action="{{ route('salidas.confirm', $salida->id) }}" method="POST" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-outline-success btn-sm"
-                                onclick="return confirm('¿Confirmar esta salida? Se actualizará el stock.')">
-                                <i class="bi bi-check2-circle"></i> Confirmar
-                            </button>
-                        </form>
-
-                        <form action="{{ route('salidas.anular', $salida->id) }}" method="POST" 
-                              onsubmit="return confirmMotivo(this)" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                <i class="bi bi-x-circle"></i> Cancelar
-                            </button>
-                        </form>
-                    @endif
-
-                    {{-- Anular solo si está confirmado --}}
-                    @if($salida->estado === 'confirmado')
-                        <form action="{{ route('salidas.anular', $salida->id) }}" method="POST" 
-                              onsubmit="return confirmMotivo(this)" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-outline-danger btn-sm">
-                                <i class="bi bi-x-circle"></i> Anular
-                            </button>
-                        </form>
-                    @endif
-
-                    {{-- PDF siempre disponible --}}
-                    <a href="{{ route('salidas.pdf', $salida->id) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
-                        <i class="bi bi-file-earmark-pdf"></i> Ver PDF
+                    <a href="{{ route('salidas.revisar', $salida->id) }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> Revisar
                     </a>
                 </div>
             </div>
@@ -133,21 +91,3 @@
     @endforeach
 </div>
 @endsection
-
-@push('scripts')
-<script>
-function confirmMotivo(form) {
-    let motivo = prompt("Ingrese el motivo:");
-    if (!motivo) {
-        alert("Debe ingresar un motivo.");
-        return false; // bloquea el submit si no hay motivo
-    }
-    let input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "motivo_anulacion";
-    input.value = motivo;
-    form.appendChild(input);
-    return true;
-}
-</script>
-@endpush

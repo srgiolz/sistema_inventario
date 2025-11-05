@@ -10,13 +10,13 @@ class DetalleTraspaso extends Model
 
     protected $fillable = [
         'traspaso_id',
-        'producto_id',  // Cambié 'producto_id' por 'producto_id'
+        'producto_id', 
         'cantidad',
     ];
 
     public function producto()
     {
-        return $this->belongsTo(Producto::class, 'producto_id');  // Cambié 'producto_id' por 'producto_id'
+        return $this->belongsTo(Producto::class, 'producto_id');  
     }
 
     public function traspaso()
